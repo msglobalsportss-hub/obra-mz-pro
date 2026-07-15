@@ -9,38 +9,284 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RecuperarPasswordRouteImport } from './routes/recuperar-password'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as EntrarRouteImport } from './routes/entrar'
+import { Route as CriarContaRouteImport } from './routes/criar-conta'
+import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppIndexRouteImport } from './routes/app.index'
+import { Route as AppRelatoriosIndexRouteImport } from './routes/app.relatorios.index'
+import { Route as AppPagamentosIndexRouteImport } from './routes/app.pagamentos.index'
+import { Route as AppOrcamentosIndexRouteImport } from './routes/app.orcamentos.index'
+import { Route as AppObrasIndexRouteImport } from './routes/app.obras.index'
+import { Route as AppEmpresaIndexRouteImport } from './routes/app.empresa.index'
+import { Route as AppConfiguracoesIndexRouteImport } from './routes/app.configuracoes.index'
+import { Route as AppClientesIndexRouteImport } from './routes/app.clientes.index'
+import { Route as AppOrcamentosNovoRouteImport } from './routes/app.orcamentos.novo'
+import { Route as AppOrcamentosIdRouteImport } from './routes/app.orcamentos.$id'
+import { Route as AppObrasIdRouteImport } from './routes/app.obras.$id'
+import { Route as AppClientesIdRouteImport } from './routes/app.clientes.$id'
 
+const RecuperarPasswordRoute = RecuperarPasswordRouteImport.update({
+  id: '/recuperar-password',
+  path: '/recuperar-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EntrarRoute = EntrarRouteImport.update({
+  id: '/entrar',
+  path: '/entrar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CriarContaRoute = CriarContaRouteImport.update({
+  id: '/criar-conta',
+  path: '/criar-conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/app',
+  path: '/app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppIndexRoute = AppIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRelatoriosIndexRoute = AppRelatoriosIndexRouteImport.update({
+  id: '/relatorios/',
+  path: '/relatorios/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPagamentosIndexRoute = AppPagamentosIndexRouteImport.update({
+  id: '/pagamentos/',
+  path: '/pagamentos/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
+  id: '/orcamentos/',
+  path: '/orcamentos/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppObrasIndexRoute = AppObrasIndexRouteImport.update({
+  id: '/obras/',
+  path: '/obras/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmpresaIndexRoute = AppEmpresaIndexRouteImport.update({
+  id: '/empresa/',
+  path: '/empresa/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppConfiguracoesIndexRoute = AppConfiguracoesIndexRouteImport.update({
+  id: '/configuracoes/',
+  path: '/configuracoes/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientesIndexRoute = AppClientesIndexRouteImport.update({
+  id: '/clientes/',
+  path: '/clientes/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrcamentosNovoRoute = AppOrcamentosNovoRouteImport.update({
+  id: '/orcamentos/novo',
+  path: '/orcamentos/novo',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOrcamentosIdRoute = AppOrcamentosIdRouteImport.update({
+  id: '/orcamentos/$id',
+  path: '/orcamentos/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppObrasIdRoute = AppObrasIdRouteImport.update({
+  id: '/obras/$id',
+  path: '/obras/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientesIdRoute = AppClientesIdRouteImport.update({
+  id: '/clientes/$id',
+  path: '/clientes/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/criar-conta': typeof CriarContaRoute
+  '/entrar': typeof EntrarRoute
+  '/onboarding': typeof OnboardingRoute
+  '/recuperar-password': typeof RecuperarPasswordRoute
+  '/app/': typeof AppIndexRoute
+  '/app/clientes/$id': typeof AppClientesIdRoute
+  '/app/obras/$id': typeof AppObrasIdRoute
+  '/app/orcamentos/$id': typeof AppOrcamentosIdRoute
+  '/app/orcamentos/novo': typeof AppOrcamentosNovoRoute
+  '/app/clientes/': typeof AppClientesIndexRoute
+  '/app/configuracoes/': typeof AppConfiguracoesIndexRoute
+  '/app/empresa/': typeof AppEmpresaIndexRoute
+  '/app/obras/': typeof AppObrasIndexRoute
+  '/app/orcamentos/': typeof AppOrcamentosIndexRoute
+  '/app/pagamentos/': typeof AppPagamentosIndexRoute
+  '/app/relatorios/': typeof AppRelatoriosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/criar-conta': typeof CriarContaRoute
+  '/entrar': typeof EntrarRoute
+  '/onboarding': typeof OnboardingRoute
+  '/recuperar-password': typeof RecuperarPasswordRoute
+  '/app': typeof AppIndexRoute
+  '/app/clientes/$id': typeof AppClientesIdRoute
+  '/app/obras/$id': typeof AppObrasIdRoute
+  '/app/orcamentos/$id': typeof AppOrcamentosIdRoute
+  '/app/orcamentos/novo': typeof AppOrcamentosNovoRoute
+  '/app/clientes': typeof AppClientesIndexRoute
+  '/app/configuracoes': typeof AppConfiguracoesIndexRoute
+  '/app/empresa': typeof AppEmpresaIndexRoute
+  '/app/obras': typeof AppObrasIndexRoute
+  '/app/orcamentos': typeof AppOrcamentosIndexRoute
+  '/app/pagamentos': typeof AppPagamentosIndexRoute
+  '/app/relatorios': typeof AppRelatoriosIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/app': typeof AppRouteWithChildren
+  '/criar-conta': typeof CriarContaRoute
+  '/entrar': typeof EntrarRoute
+  '/onboarding': typeof OnboardingRoute
+  '/recuperar-password': typeof RecuperarPasswordRoute
+  '/app/': typeof AppIndexRoute
+  '/app/clientes/$id': typeof AppClientesIdRoute
+  '/app/obras/$id': typeof AppObrasIdRoute
+  '/app/orcamentos/$id': typeof AppOrcamentosIdRoute
+  '/app/orcamentos/novo': typeof AppOrcamentosNovoRoute
+  '/app/clientes/': typeof AppClientesIndexRoute
+  '/app/configuracoes/': typeof AppConfiguracoesIndexRoute
+  '/app/empresa/': typeof AppEmpresaIndexRoute
+  '/app/obras/': typeof AppObrasIndexRoute
+  '/app/orcamentos/': typeof AppOrcamentosIndexRoute
+  '/app/pagamentos/': typeof AppPagamentosIndexRoute
+  '/app/relatorios/': typeof AppRelatoriosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/criar-conta'
+    | '/entrar'
+    | '/onboarding'
+    | '/recuperar-password'
+    | '/app/'
+    | '/app/clientes/$id'
+    | '/app/obras/$id'
+    | '/app/orcamentos/$id'
+    | '/app/orcamentos/novo'
+    | '/app/clientes/'
+    | '/app/configuracoes/'
+    | '/app/empresa/'
+    | '/app/obras/'
+    | '/app/orcamentos/'
+    | '/app/pagamentos/'
+    | '/app/relatorios/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/criar-conta'
+    | '/entrar'
+    | '/onboarding'
+    | '/recuperar-password'
+    | '/app'
+    | '/app/clientes/$id'
+    | '/app/obras/$id'
+    | '/app/orcamentos/$id'
+    | '/app/orcamentos/novo'
+    | '/app/clientes'
+    | '/app/configuracoes'
+    | '/app/empresa'
+    | '/app/obras'
+    | '/app/orcamentos'
+    | '/app/pagamentos'
+    | '/app/relatorios'
+  id:
+    | '__root__'
+    | '/'
+    | '/app'
+    | '/criar-conta'
+    | '/entrar'
+    | '/onboarding'
+    | '/recuperar-password'
+    | '/app/'
+    | '/app/clientes/$id'
+    | '/app/obras/$id'
+    | '/app/orcamentos/$id'
+    | '/app/orcamentos/novo'
+    | '/app/clientes/'
+    | '/app/configuracoes/'
+    | '/app/empresa/'
+    | '/app/obras/'
+    | '/app/orcamentos/'
+    | '/app/pagamentos/'
+    | '/app/relatorios/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  CriarContaRoute: typeof CriarContaRoute
+  EntrarRoute: typeof EntrarRoute
+  OnboardingRoute: typeof OnboardingRoute
+  RecuperarPasswordRoute: typeof RecuperarPasswordRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/recuperar-password': {
+      id: '/recuperar-password'
+      path: '/recuperar-password'
+      fullPath: '/recuperar-password'
+      preLoaderRoute: typeof RecuperarPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/entrar': {
+      id: '/entrar'
+      path: '/entrar'
+      fullPath: '/entrar'
+      preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/criar-conta': {
+      id: '/criar-conta'
+      path: '/criar-conta'
+      fullPath: '/criar-conta'
+      preLoaderRoute: typeof CriarContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/app': {
+      id: '/app'
+      path: '/app'
+      fullPath: '/app'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +294,133 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/': {
+      id: '/app/'
+      path: '/'
+      fullPath: '/app/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/relatorios/': {
+      id: '/app/relatorios/'
+      path: '/relatorios'
+      fullPath: '/app/relatorios/'
+      preLoaderRoute: typeof AppRelatoriosIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/pagamentos/': {
+      id: '/app/pagamentos/'
+      path: '/pagamentos'
+      fullPath: '/app/pagamentos/'
+      preLoaderRoute: typeof AppPagamentosIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/orcamentos/': {
+      id: '/app/orcamentos/'
+      path: '/orcamentos'
+      fullPath: '/app/orcamentos/'
+      preLoaderRoute: typeof AppOrcamentosIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/obras/': {
+      id: '/app/obras/'
+      path: '/obras'
+      fullPath: '/app/obras/'
+      preLoaderRoute: typeof AppObrasIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/empresa/': {
+      id: '/app/empresa/'
+      path: '/empresa'
+      fullPath: '/app/empresa/'
+      preLoaderRoute: typeof AppEmpresaIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/configuracoes/': {
+      id: '/app/configuracoes/'
+      path: '/configuracoes'
+      fullPath: '/app/configuracoes/'
+      preLoaderRoute: typeof AppConfiguracoesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/clientes/': {
+      id: '/app/clientes/'
+      path: '/clientes'
+      fullPath: '/app/clientes/'
+      preLoaderRoute: typeof AppClientesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/orcamentos/novo': {
+      id: '/app/orcamentos/novo'
+      path: '/orcamentos/novo'
+      fullPath: '/app/orcamentos/novo'
+      preLoaderRoute: typeof AppOrcamentosNovoRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/orcamentos/$id': {
+      id: '/app/orcamentos/$id'
+      path: '/orcamentos/$id'
+      fullPath: '/app/orcamentos/$id'
+      preLoaderRoute: typeof AppOrcamentosIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/obras/$id': {
+      id: '/app/obras/$id'
+      path: '/obras/$id'
+      fullPath: '/app/obras/$id'
+      preLoaderRoute: typeof AppObrasIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/clientes/$id': {
+      id: '/app/clientes/$id'
+      path: '/clientes/$id'
+      fullPath: '/app/clientes/$id'
+      preLoaderRoute: typeof AppClientesIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppIndexRoute: typeof AppIndexRoute
+  AppClientesIdRoute: typeof AppClientesIdRoute
+  AppObrasIdRoute: typeof AppObrasIdRoute
+  AppOrcamentosIdRoute: typeof AppOrcamentosIdRoute
+  AppOrcamentosNovoRoute: typeof AppOrcamentosNovoRoute
+  AppClientesIndexRoute: typeof AppClientesIndexRoute
+  AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
+  AppEmpresaIndexRoute: typeof AppEmpresaIndexRoute
+  AppObrasIndexRoute: typeof AppObrasIndexRoute
+  AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
+  AppPagamentosIndexRoute: typeof AppPagamentosIndexRoute
+  AppRelatoriosIndexRoute: typeof AppRelatoriosIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppIndexRoute: AppIndexRoute,
+  AppClientesIdRoute: AppClientesIdRoute,
+  AppObrasIdRoute: AppObrasIdRoute,
+  AppOrcamentosIdRoute: AppOrcamentosIdRoute,
+  AppOrcamentosNovoRoute: AppOrcamentosNovoRoute,
+  AppClientesIndexRoute: AppClientesIndexRoute,
+  AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
+  AppEmpresaIndexRoute: AppEmpresaIndexRoute,
+  AppObrasIndexRoute: AppObrasIndexRoute,
+  AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
+  AppPagamentosIndexRoute: AppPagamentosIndexRoute,
+  AppRelatoriosIndexRoute: AppRelatoriosIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  CriarContaRoute: CriarContaRoute,
+  EntrarRoute: EntrarRoute,
+  OnboardingRoute: OnboardingRoute,
+  RecuperarPasswordRoute: RecuperarPasswordRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
