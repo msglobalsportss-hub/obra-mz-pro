@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RecuperarPasswordRouteImport } from './routes/recuperar-password'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as CriarContaRouteImport } from './routes/criar-conta'
 import { Route as AppRouteImport } from './routes/app'
@@ -18,6 +19,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const RecuperarPasswordRoute = RecuperarPasswordRouteImport.update({
   id: '/recuperar-password',
   path: '/recuperar-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EntrarRoute = EntrarRouteImport.update({
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/app': typeof AppRoute
   '/criar-conta': typeof CriarContaRoute
   '/entrar': typeof EntrarRoute
+  '/onboarding': typeof OnboardingRoute
   '/recuperar-password': typeof RecuperarPasswordRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/app': typeof AppRoute
   '/criar-conta': typeof CriarContaRoute
   '/entrar': typeof EntrarRoute
+  '/onboarding': typeof OnboardingRoute
   '/recuperar-password': typeof RecuperarPasswordRoute
 }
 export interface FileRoutesById {
@@ -61,19 +69,33 @@ export interface FileRoutesById {
   '/app': typeof AppRoute
   '/criar-conta': typeof CriarContaRoute
   '/entrar': typeof EntrarRoute
+  '/onboarding': typeof OnboardingRoute
   '/recuperar-password': typeof RecuperarPasswordRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/app' | '/criar-conta' | '/entrar' | '/recuperar-password'
+  fullPaths:
+    | '/'
+    | '/app'
+    | '/criar-conta'
+    | '/entrar'
+    | '/onboarding'
+    | '/recuperar-password'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/app' | '/criar-conta' | '/entrar' | '/recuperar-password'
+  to:
+    | '/'
+    | '/app'
+    | '/criar-conta'
+    | '/entrar'
+    | '/onboarding'
+    | '/recuperar-password'
   id:
     | '__root__'
     | '/'
     | '/app'
     | '/criar-conta'
     | '/entrar'
+    | '/onboarding'
     | '/recuperar-password'
   fileRoutesById: FileRoutesById
 }
@@ -82,6 +104,7 @@ export interface RootRouteChildren {
   AppRoute: typeof AppRoute
   CriarContaRoute: typeof CriarContaRoute
   EntrarRoute: typeof EntrarRoute
+  OnboardingRoute: typeof OnboardingRoute
   RecuperarPasswordRoute: typeof RecuperarPasswordRoute
 }
 
@@ -92,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/recuperar-password'
       fullPath: '/recuperar-password'
       preLoaderRoute: typeof RecuperarPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/entrar': {
@@ -130,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRoute,
   CriarContaRoute: CriarContaRoute,
   EntrarRoute: EntrarRoute,
+  OnboardingRoute: OnboardingRoute,
   RecuperarPasswordRoute: RecuperarPasswordRoute,
 }
 export const routeTree = rootRouteImport
