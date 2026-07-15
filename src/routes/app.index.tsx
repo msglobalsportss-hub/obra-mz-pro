@@ -216,7 +216,7 @@ function Dashboard() {
                   <div className="truncate text-xs text-muted-foreground">{obraById(p.obraId)?.nome} · {p.referencia}</div>
                 </div>
                 <div className="hidden sm:block">
-                  <StatusBadge tone="success">{estadoObraLabel ? "Confirmado" : ""}Confirmado</StatusBadge>
+                  <StatusBadge tone="success">Confirmado</StatusBadge>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold">{formatMZN(p.valor)}</div>
