@@ -4,14 +4,19 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { utilizador } from "@/lib/mock-data";
+import { useObraMZStore } from "@/store/obramz-store";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { initials } from "@/lib/format";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/app")({
   component: AppLayout,
 });
 
 function AppLayout() {
+  const utilizador = useObraMZStore((s) => s.utilizador);
+  const hydrated = useHydrated();
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-muted/40">
@@ -26,7 +31,7 @@ function AppLayout() {
               </div>
             </div>
             <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
-              <button className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
+              <button className="grid h-9 w-9 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Notificações">
                 <Bell className="h-4 w-4" />
               </button>
               <div className="hidden text-right sm:block">
@@ -41,10 +46,25 @@ function AppLayout() {
             </div>
           </header>
           <main className="flex-1 p-4 sm:p-6 lg:p-8">
-            <Outlet />
+            {hydrated ? <Outlet /> : <LoadingShell />}
           </main>
         </SidebarInset>
       </div>
     </SidebarProvider>
+  );
+}
+
+function LoadingShell() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-10 w-64" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+        <Skeleton className="h-24" />
+      </div>
+      <Skeleton className="h-96" />
+    </div>
   );
 }

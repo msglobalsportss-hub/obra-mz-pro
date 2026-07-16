@@ -8,7 +8,7 @@ import {
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { empresa, utilizador } from "@/lib/mock-data";
+import { useObraMZStore } from "@/store/obramz-store";
 import { initials } from "@/lib/format";
 
 const items = [
@@ -27,6 +27,8 @@ const secondary = [
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const empresa = useObraMZStore((s) => s.empresa);
+  const utilizador = useObraMZStore((s) => s.utilizador);
   const isActive = (url: string, exact?: boolean) =>
     exact ? pathname === url : pathname === url || pathname.startsWith(url + "/");
 
