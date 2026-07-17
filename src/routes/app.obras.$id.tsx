@@ -148,8 +148,11 @@ function ObraDetalhe() {
       </div>
 
       <Tabs defaultValue="overview" className="mt-6">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
+          <TabsTrigger value="diario">Diário ({(obra.eventos ?? []).length})</TabsTrigger>
+          <TabsTrigger value="fotos">Fotografias ({(obra.fotos ?? []).length})</TabsTrigger>
+          <TabsTrigger value="fases">Fases ({(obra.fases ?? []).length})</TabsTrigger>
           <TabsTrigger value="orcamentos">Orçamentos ({orcamentos.length})</TabsTrigger>
           <TabsTrigger value="pagamentos">Pagamentos ({pagamentos.length})</TabsTrigger>
         </TabsList>
@@ -165,9 +168,6 @@ function ObraDetalhe() {
                   <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{obra.observacoes}</p>
                 </>
               )}
-              <div className="mt-6">
-                <TimelineEditor obraId={obra.id} eventos={obra.eventos} />
-              </div>
             </Card>
             <Card className="p-5">
               <div className="mb-2 flex items-center justify-between">
@@ -184,6 +184,25 @@ function ObraDetalhe() {
             </Card>
           </div>
         </TabsContent>
+
+        <TabsContent value="diario" className="mt-4">
+          <Card className="p-5">
+            <TimelineEditor obraId={obra.id} eventos={obra.eventos ?? []} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fotos" className="mt-4">
+          <Card className="p-5">
+            <PhotoGallery obraId={obra.id} fotos={obra.fotos ?? []} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fases" className="mt-4">
+          <Card className="p-5">
+            <PhasesEditor obraId={obra.id} fases={obra.fases ?? []} />
+          </Card>
+        </TabsContent>
+
 
         <TabsContent value="orcamentos" className="mt-4">
           <Card>
