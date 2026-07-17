@@ -35,6 +35,27 @@ export type ObraEvento = {
   visibilidade: "publica" | "privada";
 };
 
+export type ObraFoto = {
+  id: string;
+  dataUrl: string;
+  legenda?: string;
+  data: string;
+  criadoEm: string;
+};
+
+export type EstadoFase = "pendente" | "em_andamento" | "concluida";
+
+export type ObraFase = {
+  id: string;
+  nome: string;
+  descricao?: string;
+  ordem: number;
+  estado: EstadoFase;
+  progresso: number;
+  inicio?: string;
+  fim?: string;
+};
+
 export type Obra = {
   id: string;
   nome: string;
@@ -53,8 +74,11 @@ export type Obra = {
   observacoes?: string;
   progressoAtualizadoEm?: string;
   eventos: ObraEvento[];
+  fotos?: ObraFoto[];
+  fases?: ObraFase[];
   criadoEm: string;
 };
+
 
 export type EstadoOrcamento =
   | "rascunho"
@@ -196,6 +220,13 @@ export const estadoPagamentoLabel: Record<EstadoPagamento, string> = {
   pendente: "Pendente", confirmado: "Confirmado",
   cancelado: "Cancelado", reembolsado: "Reembolsado",
 };
+
+export const estadoFaseLabel: Record<EstadoFase, string> = {
+  pendente: "Pendente",
+  em_andamento: "Em andamento",
+  concluida: "Concluída",
+};
+
 
 export const tipoEventoLabel: Record<TimelineEventoTipo, string> = {
   obra_criada: "Obra criada",

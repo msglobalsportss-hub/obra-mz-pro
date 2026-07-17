@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { PageHeader, StatusBadge } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,7 +22,10 @@ import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { TimelineEditor } from "@/components/projects/timeline-editor";
+import { PhotoGallery } from "@/components/projects/photo-gallery";
+import { PhasesEditor } from "@/components/projects/phases-editor";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/app/obras/$id")({ component: ObraDetalhe });
 
@@ -145,8 +148,11 @@ function ObraDetalhe() {
       </div>
 
       <Tabs defaultValue="overview" className="mt-6">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
+          <TabsTrigger value="diario">Diário ({(obra.eventos ?? []).length})</TabsTrigger>
+          <TabsTrigger value="fotos">Fotografias ({(obra.fotos ?? []).length})</TabsTrigger>
+          <TabsTrigger value="fases">Fases ({(obra.fases ?? []).length})</TabsTrigger>
           <TabsTrigger value="orcamentos">Orçamentos ({orcamentos.length})</TabsTrigger>
           <TabsTrigger value="pagamentos">Pagamentos ({pagamentos.length})</TabsTrigger>
         </TabsList>
@@ -162,9 +168,6 @@ function ObraDetalhe() {
                   <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{obra.observacoes}</p>
                 </>
               )}
-              <div className="mt-6">
-                <TimelineEditor obraId={obra.id} eventos={obra.eventos} />
-              </div>
             </Card>
             <Card className="p-5">
               <div className="mb-2 flex items-center justify-between">
@@ -181,6 +184,25 @@ function ObraDetalhe() {
             </Card>
           </div>
         </TabsContent>
+
+        <TabsContent value="diario" className="mt-4">
+          <Card className="p-5">
+            <TimelineEditor obraId={obra.id} eventos={obra.eventos ?? []} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fotos" className="mt-4">
+          <Card className="p-5">
+            <PhotoGallery obraId={obra.id} fotos={obra.fotos ?? []} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="fases" className="mt-4">
+          <Card className="p-5">
+            <PhasesEditor obraId={obra.id} fases={obra.fases ?? []} />
+          </Card>
+        </TabsContent>
+
 
         <TabsContent value="orcamentos" className="mt-4">
           <Card>
