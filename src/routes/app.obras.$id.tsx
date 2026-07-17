@@ -35,8 +35,9 @@ function ObraDetalhe() {
   const nav = useNavigate();
   const obra = useObraMZStore((s) => s.obras.find((o) => o.id === id));
   const cliente = useObraMZStore((s) => (obra ? s.clientes.find((c) => c.id === obra.clienteId) : undefined));
-  const orcamentos = useObraMZStore((s) => s.orcamentos.filter((o) => o.obraId === id));
-  const pagamentos = useObraMZStore((s) => s.pagamentos.filter((p) => p.obraId === id));
+  const orcamentos = useObraMZStore(useShallow((s) => s.orcamentos.filter((o) => o.obraId === id)));
+  const pagamentos = useObraMZStore(useShallow((s) => s.pagamentos.filter((p) => p.obraId === id)));
+
   const updateObraProgresso = useObraMZStore((s) => s.updateObraProgresso);
   const updateObraEstado = useObraMZStore((s) => s.updateObraEstado);
   const deleteObra = useObraMZStore((s) => s.deleteObra);
