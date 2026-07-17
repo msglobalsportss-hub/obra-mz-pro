@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
+import { useShallow } from "zustand/react/shallow";
+
 import { PageHeader, StatusBadge } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,8 +37,9 @@ function ObraDetalhe() {
   const nav = useNavigate();
   const obra = useObraMZStore((s) => s.obras.find((o) => o.id === id));
   const cliente = useObraMZStore((s) => (obra ? s.clientes.find((c) => c.id === obra.clienteId) : undefined));
-  const orcamentos = useObraMZStore((s) => s.orcamentos.filter((o) => o.obraId === id));
-  const pagamentos = useObraMZStore((s) => s.pagamentos.filter((p) => p.obraId === id));
+  const orcamentos = useObraMZStore(useShallow((s) => s.orcamentos.filter((o) => o.obraId === id)));
+  const pagamentos = useObraMZStore(useShallow((s) => s.pagamentos.filter((p) => p.obraId === id)));
+
   const updateObraProgresso = useObraMZStore((s) => s.updateObraProgresso);
   const updateObraEstado = useObraMZStore((s) => s.updateObraEstado);
   const deleteObra = useObraMZStore((s) => s.deleteObra);
@@ -65,6 +68,7 @@ function ObraDetalhe() {
     }
     setProgresso(null);
   };
+
 
   return (
     <div>
@@ -105,12 +109,14 @@ function ObraDetalhe() {
                 <span className="font-bold text-primary">{currentProg}%</span>
               </div>
               <Slider
-                value={[currentProg]}
+                key={`${obra.id}-${obra.progresso}`}
+                defaultValue={[obra.progresso]}
                 onValueChange={(v) => setProgresso(v[0] ?? 0)}
                 onValueCommit={saveProgresso}
                 max={100} step={1}
                 disabled={obra.estado === "concluida" || obra.estado === "cancelada"}
               />
+
               {obra.progressoAtualizadoEm && (
                 <div className="mt-1 text-[11px] text-muted-foreground">
                   Atualizado em {formatDate(obra.progressoAtualizadoEm)}
