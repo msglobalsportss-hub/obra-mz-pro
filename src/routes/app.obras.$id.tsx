@@ -22,7 +22,10 @@ import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { TimelineEditor } from "@/components/projects/timeline-editor";
+import { PhotoGallery } from "@/components/projects/photo-gallery";
+import { PhasesEditor } from "@/components/projects/phases-editor";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/app/obras/$id")({ component: ObraDetalhe });
 
