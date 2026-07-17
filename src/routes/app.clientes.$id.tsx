@@ -25,9 +25,10 @@ function ClienteDetalhe() {
   const { id } = useParams({ from: "/app/clientes/$id" });
   const nav = useNavigate();
   const cliente = useObraMZStore((s) => s.clientes.find((c) => c.id === id));
-  const obras = useObraMZStore((s) => s.obras.filter((o) => o.clienteId === id));
-  const orcamentos = useObraMZStore((s) => s.orcamentos.filter((o) => o.clienteId === id));
-  const pagamentos = useObraMZStore((s) => s.pagamentos.filter((p) => p.clienteId === id));
+  const obras = useObraMZStore(useShallow((s) => s.obras.filter((o) => o.clienteId === id)));
+  const orcamentos = useObraMZStore(useShallow((s) => s.orcamentos.filter((o) => o.clienteId === id)));
+  const pagamentos = useObraMZStore(useShallow((s) => s.pagamentos.filter((p) => p.clienteId === id)));
+
   const deleteCliente = useObraMZStore((s) => s.deleteCliente);
 
   const [editOpen, setEditOpen] = useState(false);
