@@ -106,12 +106,14 @@ function ObraDetalhe() {
                 <span className="font-bold text-primary">{currentProg}%</span>
               </div>
               <Slider
-                value={[currentProg]}
+                key={`${obra.id}-${obra.progresso}`}
+                defaultValue={[obra.progresso]}
                 onValueChange={(v) => setProgresso(v[0] ?? 0)}
                 onValueCommit={saveProgresso}
                 max={100} step={1}
                 disabled={obra.estado === "concluida" || obra.estado === "cancelada"}
               />
+
               {obra.progressoAtualizadoEm && (
                 <div className="mt-1 text-[11px] text-muted-foreground">
                   Atualizado em {formatDate(obra.progressoAtualizadoEm)}
