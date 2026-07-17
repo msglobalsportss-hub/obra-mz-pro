@@ -1,9 +1,10 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
-  Cliente, Obra, ObraEvento, Orcamento, OrcamentoHistorico, Pagamento,
+  Cliente, Obra, ObraEvento, ObraFoto, ObraFase, Orcamento, OrcamentoHistorico, Pagamento,
   Atividade, Empresa, Utilizador, EstadoOrcamento, EstadoObra,
 } from "@/lib/mock-data";
+
 import { totalOrcamento } from "@/lib/mock-data";
 
 const nowIso = () => new Date().toISOString();
@@ -335,6 +336,15 @@ export type ObraMZState = {
   addObraEvento: (obraId: string, evento: Omit<ObraEvento, "id">) => void;
   updateObraEvento: (obraId: string, evento: ObraEvento) => void;
   deleteObraEvento: (obraId: string, eventoId: string) => void;
+  addObraFoto: (obraId: string, foto: Omit<ObraFoto, "id" | "criadoEm">) => void;
+  updateObraFoto: (obraId: string, fotoId: string, patch: Partial<ObraFoto>) => void;
+  deleteObraFoto: (obraId: string, fotoId: string) => void;
+  addObraFase: (obraId: string, fase: Omit<ObraFase, "id" | "ordem">) => void;
+  updateObraFase: (obraId: string, faseId: string, patch: Partial<ObraFase>) => void;
+  deleteObraFase: (obraId: string, faseId: string) => void;
+  reorderObraFases: (obraId: string, faseId: string, direcao: "cima" | "baixo") => void;
+  aplicarProgressoFases: (obraId: string) => void;
+
 
   // Orçamentos
   createOrcamento: (data: Omit<Orcamento, "id" | "criadoEm" | "atualizadoEm" | "historico" | "numero"> & { numero?: string }) => Orcamento;
@@ -493,6 +503,93 @@ export const useObraMZStore = create<ObraMZState>()(
           ),
         }));
       },
+
+      addObraFoto: (obraId, foto) => {
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId
+              ? { ...o, fotos: [...(o.fotos ?? []), { ...foto, id: uid(), criadoEm: nowIso() }] }
+              : o,
+          ),
+        }));
+      },
+      updateObraFoto: (obraId, fotoId, patch) => {
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId
+              ? { ...o, fotos: (o.fotos ?? []).map((f) => (f.id === fotoId ? { ...f, ...patch } : f)) }
+              : o,
+          ),
+        }));
+      },
+      deleteObraFoto: (obraId, fotoId) => {
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId ? { ...o, fotos: (o.fotos ?? []).filter((f) => f.id !== fotoId) } : o,
+          ),
+        }));
+      },
+
+      addObraFase: (obraId, fase) => {
+        set((s) => ({
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            const fases = o.fases ?? [];
+            const ordem = fases.length ? Math.max(...fases.map((f) => f.ordem)) + 1 : 1;
+            return { ...o, fases: [...fases, { ...fase, id: uid(), ordem }] };
+          }),
+        }));
+      },
+      updateObraFase: (obraId, faseId, patch) => {
+        set((s) => ({
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            return {
+              ...o,
+              fases: (o.fases ?? []).map((f) => {
+                if (f.id !== faseId) return f;
+                const merged = { ...f, ...patch };
+                // sync progresso/estado convenience
+                if (patch.estado === "concluida") merged.progresso = 100;
+                if (patch.estado === "pendente" && merged.progresso === undefined) merged.progresso = 0;
+                if (patch.progresso === 100) merged.estado = "concluida";
+                else if (patch.progresso !== undefined && patch.progresso > 0 && merged.estado === "pendente") merged.estado = "em_andamento";
+                return merged;
+              }),
+            };
+          }),
+        }));
+      },
+      deleteObraFase: (obraId, faseId) => {
+        set((s) => ({
+          obras: s.obras.map((o) =>
+            o.id === obraId ? { ...o, fases: (o.fases ?? []).filter((f) => f.id !== faseId) } : o,
+          ),
+        }));
+      },
+      reorderObraFases: (obraId, faseId, direcao) => {
+        set((s) => ({
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            const fases = [...(o.fases ?? [])].sort((a, b) => a.ordem - b.ordem);
+            const idx = fases.findIndex((f) => f.id === faseId);
+            if (idx === -1) return o;
+            const target = direcao === "cima" ? idx - 1 : idx + 1;
+            if (target < 0 || target >= fases.length) return o;
+            [fases[idx], fases[target]] = [fases[target]!, fases[idx]!];
+            return { ...o, fases: fases.map((f, i) => ({ ...f, ordem: i + 1 })) };
+          }),
+        }));
+      },
+      aplicarProgressoFases: (obraId) => {
+        const obra = get().obras.find((o) => o.id === obraId);
+        if (!obra || !obra.fases || obra.fases.length === 0) return;
+        const media = Math.round(
+          obra.fases.reduce((s, f) => s + Math.min(100, Math.max(0, f.progresso ?? 0)), 0) / obra.fases.length,
+        );
+        get().updateObraProgresso(obraId, media);
+      },
+
 
       // ---- Orçamentos ----
       createOrcamento: (data) => {
