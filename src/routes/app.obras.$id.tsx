@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useParams, useNavigate } from "@tanstack/react-router";
+import { useShallow } from "zustand/react/shallow";
+
 import { PageHeader, StatusBadge } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
