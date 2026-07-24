@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   Cliente, Obra, ObraEvento, ObraFoto, ObraFase, Orcamento, OrcamentoHistorico, Pagamento,
-  Atividade, Empresa, Utilizador, EstadoOrcamento, EstadoObra,
+  Atividade, Empresa, Utilizador, EstadoOrcamento, EstadoObra, Worker, Team, ProjectAssignment,
+  AttendanceStatus, AttendanceRecord,
 } from "@/lib/mock-data";
 
 import { totalOrcamento } from "@/lib/mock-data";
@@ -314,6 +315,9 @@ export type ObraMZState = {
   orcamentos: Orcamento[];
   pagamentos: Pagamento[];
   atividades: Atividade[];
+  workers: Worker[];
+  teams: Team[];
+  projectAssignments: ProjectAssignment[];
   empresa: Empresa;
   utilizador: Utilizador;
   _hydrated: boolean;
@@ -362,9 +366,95 @@ export type ObraMZState = {
   updateEmpresa: (patch: Partial<Empresa>) => void;
   updateUtilizador: (patch: Partial<Utilizador>) => void;
 
+  // Trabalhadores
+  createWorker: (data: Omit<Worker, "id" | "createdAt" | "updatedAt">) => Worker;
+  updateWorker: (id: string, patch: Partial<Worker>) => void;
+  setWorkerStatus: (id: string, status: Worker["status"]) => void;
+
+  // Equipas
+  createTeam: (data: Omit<Team, "id" | "createdAt" | "updatedAt">) => Team;
+  updateTeam: (id: string, patch: Partial<Team>) => void;
+  setTeamStatus: (id: string, status: Team["status"]) => void;
+
+  // Atribuições
+  createProjectAssignment: (data: Omit<ProjectAssignment, "id" | "createdAt" | "updatedAt" | "status">) => ProjectAssignment;
+  updateProjectAssignment: (id: string, patch: Partial<ProjectAssignment>) => void;
+  completeProjectAssignment: (id: string, endDate: string) => void;
+  cancelProjectAssignment: (id: string) => void;
+
+  // Presenças (Sprint 4.1)
+  attendanceRecords: AttendanceRecord[];
+  addAttendanceRecord: (data: Omit<AttendanceRecord, "id" | "createdAt" | "updatedAt">) => AttendanceRecord;
+  updateAttendanceRecord: (id: string, patch: Partial<AttendanceRecord>) => void;
+  deleteAttendanceRecord: (id: string) => void;
+  getAttendanceRecordById: (id: string) => AttendanceRecord | undefined;
+  bulkUpsertAttendanceRecords: (data: Omit<AttendanceRecord, "id" | "createdAt" | "updatedAt">[]) => { created: number; updated: number };
+
   // Utilidades
   resetDemoData: () => void;
 };
+
+const workersSeed: Worker[] = [
+  {
+    id: "w1",
+    name: "Mateus Tembe",
+    phone: "+258 84 999 1111",
+    role: "Pedreiro",
+    status: "active",
+    hireDate: "2026-01-10",
+    paymentType: "daily",
+    dailyRate: 1200,
+    createdAt: "2026-01-10T09:00:00.000Z",
+    updatedAt: "2026-01-10T09:00:00.000Z",
+  },
+  {
+    id: "w2",
+    name: "Lucas Mondlane",
+    phone: "+258 82 888 2222",
+    role: "Servente",
+    status: "active",
+    hireDate: "2026-02-15",
+    paymentType: "daily",
+    dailyRate: 800,
+    createdAt: "2026-02-15T09:00:00.000Z",
+    updatedAt: "2026-02-15T09:00:00.000Z",
+  },
+  {
+    id: "w3",
+    name: "Jonas Machava",
+    phone: "+258 87 777 3333",
+    role: "Carpinteiro",
+    status: "active",
+    hireDate: "2026-03-20",
+    paymentType: "hourly",
+    hourlyRate: 150,
+    createdAt: "2026-03-20T09:00:00.000Z",
+    updatedAt: "2026-03-20T09:00:00.000Z",
+  },
+];
+
+const teamsSeed: Team[] = [
+  {
+    id: "t1",
+    name: "Equipa de Alvenaria A",
+    description: "Equipa responsável pelo levantamento de paredes e alvenarias estruturais.",
+    leaderWorkerId: "w1",
+    workerIds: ["w1", "w2"],
+    status: "active",
+    createdAt: "2026-04-01T09:00:00.000Z",
+    updatedAt: "2026-04-01T09:00:00.000Z",
+  },
+  {
+    id: "t2",
+    name: "Equipa de Acabamentos",
+    description: "Equipa focada em revestimentos, pinturas e retoques finais.",
+    leaderWorkerId: undefined,
+    workerIds: ["w3"],
+    status: "active",
+    createdAt: "2026-05-15T09:00:00.000Z",
+    updatedAt: "2026-05-15T09:00:00.000Z",
+  }
+];
 
 const initialState = {
   clientes: clientesSeed,
@@ -372,6 +462,10 @@ const initialState = {
   orcamentos: orcamentosSeed,
   pagamentos: pagamentosSeed,
   atividades: atividadesSeed,
+  workers: workersSeed,
+  teams: teamsSeed,
+  projectAssignments: [],
+  attendanceRecords: [],
   empresa: empresaSeed,
   utilizador: utilizadorSeed,
 };
@@ -505,28 +599,113 @@ export const useObraMZStore = create<ObraMZState>()(
       },
 
       addObraFoto: (obraId, foto) => {
+        const id = uid();
+        const now = nowIso();
+        const tipo = foto.tipo || "normal";
+        const finalFoto: ObraFoto = {
+          ...foto,
+          id,
+          tipo,
+          criadoEm: now,
+          createdAt: now,
+          projectId: obraId,
+        };
+
+        if (tipo === "antes") {
+          finalFoto.beforeAfterGroupId = id;
+        }
+
         set((s) => ({
-          obras: s.obras.map((o) =>
-            o.id === obraId
-              ? { ...o, fotos: [...(o.fotos ?? []), { ...foto, id: uid(), criadoEm: nowIso() }] }
-              : o,
-          ),
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            let fotos = o.fotos ?? [];
+
+            if (tipo === "depois" && foto.beforeAfterGroupId) {
+              const antesFotoId = foto.beforeAfterGroupId;
+              const antesFoto = fotos.find((f) => f.id === antesFotoId);
+              if (antesFoto && antesFoto.tipo === "antes" && antesFoto.id !== id) {
+                fotos = fotos.map((f) =>
+                  f.id === antesFotoId
+                    ? { ...f, beforeAfterGroupId: antesFotoId }
+                    : f
+                );
+              } else {
+                finalFoto.beforeAfterGroupId = undefined;
+              }
+            }
+
+            return { ...o, fotos: [...fotos, finalFoto] };
+          }),
         }));
       },
       updateObraFoto: (obraId, fotoId, patch) => {
         set((s) => ({
-          obras: s.obras.map((o) =>
-            o.id === obraId
-              ? { ...o, fotos: (o.fotos ?? []).map((f) => (f.id === fotoId ? { ...f, ...patch } : f)) }
-              : o,
-          ),
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            let fotos = o.fotos ?? [];
+            const current = fotos.find((f) => f.id === fotoId);
+            if (!current) return o;
+
+            const merged = { ...current, ...patch };
+
+            if (patch.tipo && patch.tipo !== current.tipo) {
+              if (patch.tipo === "antes") {
+                merged.beforeAfterGroupId = fotoId;
+              } else if (patch.tipo === "normal") {
+                merged.beforeAfterGroupId = undefined;
+              }
+            }
+
+            if (merged.tipo === "depois") {
+              if (merged.beforeAfterGroupId) {
+                const antesFotoId = merged.beforeAfterGroupId;
+                const antesFoto = fotos.find((f) => f.id === antesFotoId);
+                if (antesFoto && antesFoto.tipo === "antes" && antesFotoId !== fotoId) {
+                  fotos = fotos.map((f) =>
+                    f.id === antesFotoId
+                      ? { ...f, beforeAfterGroupId: antesFotoId }
+                      : f
+                  );
+                } else {
+                  merged.beforeAfterGroupId = undefined;
+                }
+              }
+            }
+
+            if (current.tipo === "antes" && merged.tipo !== "antes") {
+              fotos = fotos.map((f) =>
+                f.beforeAfterGroupId === current.id && f.id !== fotoId
+                  ? { ...f, beforeAfterGroupId: undefined }
+                  : f
+              );
+            }
+
+            fotos = fotos.map((f) => (f.id === fotoId ? merged : f));
+            return { ...o, fotos };
+          }),
         }));
       },
       deleteObraFoto: (obraId, fotoId) => {
         set((s) => ({
-          obras: s.obras.map((o) =>
-            o.id === obraId ? { ...o, fotos: (o.fotos ?? []).filter((f) => f.id !== fotoId) } : o,
-          ),
+          obras: s.obras.map((o) => {
+            if (o.id !== obraId) return o;
+            let fotos = o.fotos ?? [];
+            const fotoToDelete = fotos.find((f) => f.id === fotoId);
+            if (!fotoToDelete) return o;
+
+            const targetGroupId = fotoToDelete.beforeAfterGroupId;
+            fotos = fotos.filter((f) => f.id !== fotoId);
+
+            if (targetGroupId) {
+              fotos = fotos.map((f) =>
+                f.beforeAfterGroupId === targetGroupId
+                  ? { ...f, beforeAfterGroupId: undefined }
+                  : f
+              );
+            }
+
+            return { ...o, fotos };
+          }),
         }));
       },
 
@@ -686,15 +865,453 @@ export const useObraMZStore = create<ObraMZState>()(
       updateEmpresa: (patch) => set((s) => ({ empresa: { ...s.empresa, ...patch } })),
       updateUtilizador: (patch) => set((s) => ({ utilizador: { ...s.utilizador, ...patch } })),
 
+      // ---- Trabalhadores ----
+      createWorker: (data) => {
+        const worker: Worker = {
+          ...data,
+          id: uid(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+        set((s) => ({ workers: [worker, ...(s.workers || [])] }));
+        get()._addAtividade(`Trabalhador ${worker.name} registado`, "obra", worker.id);
+        return worker;
+      },
+      updateWorker: (id, patch) => {
+        set((s) => ({
+          workers: (s.workers || []).map((w) =>
+            w.id === id ? { ...w, ...patch, updatedAt: nowIso() } : w
+          ),
+        }));
+        const w = get().workers?.find((x) => x.id === id);
+        if (w) get()._addAtividade(`Trabalhador ${w.name} atualizado`, "obra", id);
+      },
+      setWorkerStatus: (id, status) => {
+        set((s) => ({
+          workers: (s.workers || []).map((w) =>
+            w.id === id ? { ...w, status, updatedAt: nowIso() } : w
+          ),
+        }));
+        const w = get().workers?.find((x) => x.id === id);
+        if (w) {
+          const accao = status === "active" ? "ativado" : "desativado";
+          get()._addAtividade(`Trabalhador ${w.name} ${accao}`, "obra", id);
+        }
+      },
+
+      // ---- Equipas ----
+      createTeam: (data) => {
+        const team: Team = {
+          ...data,
+          id: uid(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+        set((s) => ({ teams: [team, ...(s.teams || [])] }));
+        get()._addAtividade(`Equipa ${team.name} criada`, "obra", team.id);
+        return team;
+      },
+      updateTeam: (id, patch) => {
+        set((s) => ({
+          teams: (s.teams || []).map((t) =>
+            t.id === id ? { ...t, ...patch, updatedAt: nowIso() } : t
+          ),
+        }));
+        const t = get().teams?.find((x) => x.id === id);
+        if (t) get()._addAtividade(`Equipa ${t.name} atualizada`, "obra", id);
+      },
+      setTeamStatus: (id, status) => {
+        set((s) => ({
+          teams: (s.teams || []).map((t) =>
+            t.id === id ? { ...t, status, updatedAt: nowIso() } : t
+          ),
+        }));
+        const t = get().teams?.find((x) => x.id === id);
+        if (t) {
+          const accao = status === "active" ? "ativada" : "desativada";
+          get()._addAtividade(`Equipa ${t.name} ${accao}`, "obra", id);
+        }
+      },
+
+      // ---- Atribuições ----
+      createProjectAssignment: (data) => {
+        if (!data.assignmentType) {
+          throw new Error("O tipo de atribuição (assignmentType) é obrigatório.");
+        }
+
+        let assignedWorkerIds: string[] | undefined = undefined;
+
+        if (data.assignmentType === "worker") {
+          if (!data.workerId) throw new Error("workerId é obrigatório para atribuições individuais.");
+          const w = get().workers?.find((x) => x.id === data.workerId);
+          if (!w || w.status !== "active") throw new Error("Trabalhador não encontrado ou inativo.");
+
+          data.teamId = undefined;
+          data.assignedWorkerIds = undefined;
+        } else if (data.assignmentType === "team") {
+          if (!data.teamId) throw new Error("teamId é obrigatório para atribuições de equipas.");
+          const t = get().teams?.find((x) => x.id === data.teamId);
+          if (!t || t.status !== "active") throw new Error("Equipa não encontrada ou inativa.");
+
+          data.workerId = undefined;
+          const activeMembers = get().workers
+            .filter((w) => w.status === "active" && t.workerIds.includes(w.id))
+            .map((w) => w.id);
+          assignedWorkerIds = Array.from(new Set(activeMembers));
+        }
+
+        const assignment: ProjectAssignment = {
+          ...data,
+          assignedWorkerIds,
+          id: uid(),
+          status: "active",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        } as ProjectAssignment;
+
+        set((s) => ({ projectAssignments: [assignment, ...(s.projectAssignments || [])] }));
+
+        if (data.assignmentType === "team" && data.teamId) {
+          const t = get().teams?.find((x) => x.id === data.teamId);
+          const o = get().obras?.find((x) => x.id === data.projectId);
+          if (t && o) {
+            get()._addAtividade(`Equipa ${t.name} atribuída à obra ${o.nome}`, "obra", o.id);
+          }
+        } else {
+          const w = get().workers?.find((x) => x.id === data.workerId);
+          const o = get().obras?.find((x) => x.id === data.projectId);
+          if (w && o) {
+            get()._addAtividade(`Trabalhador ${w.name} atribuído à obra ${o.nome}`, "obra", o.id);
+          }
+        }
+        return assignment;
+      },
+      updateProjectAssignment: (id, patch) => {
+        set((s) => ({
+          projectAssignments: (s.projectAssignments || []).map((a) => {
+            if (a.id === id) {
+              // Impedir mudança de tipo de atribuição
+              if (patch.assignmentType && patch.assignmentType !== a.assignmentType) {
+                console.error("Não é permitido alterar o tipo de atribuição de uma alocação existente.");
+                return a;
+              }
+
+              // Bloquear alteração de beneficiário em atribuições históricas (concluídas ou canceladas)
+              if (a.status !== "active") {
+                const hasStructuralChange =
+                  "assignmentType" in patch ||
+                  "workerId" in patch ||
+                  "teamId" in patch ||
+                  "assignedWorkerIds" in patch;
+
+                if (hasStructuralChange) {
+                  return a;
+                }
+              }
+
+              const updated = { ...a, ...patch, updatedAt: nowIso() };
+
+              // Se mudou o teamId, recalcular o snapshot
+              if (updated.assignmentType === "team" && patch.teamId && patch.teamId !== a.teamId) {
+                const team = s.teams?.find((t) => t.id === patch.teamId);
+                if (team) {
+                  const activeMembers = s.workers
+                    .filter((w) => w.status === "active" && team.workerIds.includes(w.id))
+                    .map((w) => w.id);
+                  updated.assignedWorkerIds = Array.from(new Set(activeMembers));
+                } else {
+                  updated.assignedWorkerIds = [];
+                }
+              }
+
+              // Garantir integridade de campos com base no tipo
+              if (updated.assignmentType === "worker") {
+                updated.teamId = undefined;
+                updated.assignedWorkerIds = undefined;
+              } else if (updated.assignmentType === "team") {
+                updated.workerId = undefined;
+                if (!updated.assignedWorkerIds) {
+                  updated.assignedWorkerIds = [];
+                }
+              }
+
+              return updated;
+            }
+            return a;
+          }),
+        }));
+
+        const a = get().projectAssignments?.find((x) => x.id === id);
+        if (a) {
+          const o = get().obras?.find((x) => x.id === a.projectId);
+          if (o) {
+            if (a.assignmentType === "team") {
+              const t = get().teams?.find((x) => x.id === a.teamId);
+              if (t) {
+                get()._addAtividade(`Atribuição da equipa ${t.name} em ${o.nome} atualizada`, "obra", o.id);
+              }
+            } else {
+              const w = get().workers?.find((x) => x.id === a.workerId);
+              if (w) {
+                get()._addAtividade(`Atribuição de ${w.name} em ${o.nome} atualizada`, "obra", o.id);
+              }
+            }
+          }
+        }
+      },
+      completeProjectAssignment: (id, endDate) => {
+        set((s) => ({
+          projectAssignments: (s.projectAssignments || []).map((a) =>
+            a.id === id ? { ...a, status: "completed", endDate, updatedAt: nowIso() } : a
+          ),
+        }));
+
+        const a = get().projectAssignments?.find((x) => x.id === id);
+        if (a) {
+          const w = get().workers?.find((x) => x.id === a.workerId);
+          const o = get().obras?.find((x) => x.id === a.projectId);
+          if (w && o) {
+            get()._addAtividade(`Atribuição de ${w.name} em ${o.nome} concluída`, "obra", o.id);
+          }
+        }
+      },
+      cancelProjectAssignment: (id) => {
+        set((s) => ({
+          projectAssignments: (s.projectAssignments || []).map((a) =>
+            a.id === id ? { ...a, status: "cancelled", updatedAt: nowIso() } : a
+          ),
+        }));
+
+        const a = get().projectAssignments?.find((x) => x.id === id);
+        if (a) {
+          const w = get().workers?.find((x) => x.id === a.workerId);
+          const o = get().obras?.find((x) => x.id === a.projectId);
+          if (w && o) {
+            get()._addAtividade(`Atribuição de ${w.name} em ${o.nome} cancelada`, "obra", o.id);
+          }
+        }
+      },
+
+      // ---- Presenças ----
+      addAttendanceRecord: (data) => {
+        // 1. Validar duplicações na store
+        const exists = (get().attendanceRecords || []).some(
+          (r) => r.workerId === data.workerId && r.projectId === data.projectId && r.date === data.date
+        );
+        if (exists) {
+          throw new Error("Já existe um registo de presença para este trabalhador nesta obra e data.");
+        }
+
+        // 2. Validar referências
+        const worker = get().workers?.find((w) => w.id === data.workerId);
+        if (!worker) throw new Error("Trabalhador não encontrado.");
+        const obra = get().obras?.find((o) => o.id === data.projectId);
+        if (!obra) throw new Error("Obra não encontrada.");
+        if (data.phaseId) {
+          const faseExists = obra.fases?.some((f) => f.id === data.phaseId);
+          if (!faseExists) throw new Error("A fase selecionada não pertence à obra.");
+        }
+
+        // 3. Trabalhador ativo
+        if (worker.status !== "active") {
+          throw new Error("Não é possível registar presenças para trabalhadores inativos.");
+        }
+
+        // 4. Obra ativa (não concluída ou cancelada)
+        if (obra.estado === "concluida" || obra.estado === "cancelada") {
+          throw new Error("Não é possível registar presenças para obras concluídas ou canceladas.");
+        }
+
+        const record: AttendanceRecord = {
+          ...data,
+          id: uid(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+
+        set((s) => ({
+          attendanceRecords: [record, ...(s.attendanceRecords || [])],
+        }));
+
+        get()._addAtividade(`Presença de ${worker.name} registada em ${obra.nome}`, "obra", obra.id);
+        return record;
+      },
+      updateAttendanceRecord: (id, patch) => {
+        set((s) => ({
+          attendanceRecords: (s.attendanceRecords || []).map((r) => {
+            if (r.id === id) {
+              const updated = { ...r, ...patch, updatedAt: nowIso() };
+
+              // Limpar campos de horas se o estado for ausente ou falta justificada
+              if (updated.status === "absent" || updated.status === "justified_absence") {
+                updated.checkInTime = undefined;
+                updated.checkOutTime = undefined;
+                updated.breakMinutes = undefined;
+                updated.workedMinutes = undefined;
+                updated.overtimeMinutes = undefined;
+              }
+
+              // Validar duplicações na store ao editar
+              const exists = (s.attendanceRecords || []).some(
+                (other) =>
+                  other.id !== id &&
+                  other.workerId === updated.workerId &&
+                  other.projectId === updated.projectId &&
+                  other.date === updated.date
+              );
+              if (exists) {
+                throw new Error("Já existe um registo de presença para este trabalhador nesta obra e data.");
+              }
+
+              // Validar referências
+              const worker = s.workers?.find((w) => w.id === updated.workerId);
+              if (!worker) throw new Error("Trabalhador não encontrado.");
+              const obra = s.obras?.find((o) => o.id === updated.projectId);
+              if (!obra) throw new Error("Obra não encontrada.");
+              if (updated.phaseId) {
+                const faseExists = obra.fases?.some((f) => f.id === updated.phaseId);
+                if (!faseExists) throw new Error("A fase selecionada não pertence à obra.");
+              }
+
+              // Trabalhador ativo
+              if (patch.workerId && worker.status !== "active") {
+                throw new Error("Não é possível associar presenças a trabalhadores inativos.");
+              }
+
+              return updated;
+            }
+            return r;
+          }),
+        }));
+      },
+      deleteAttendanceRecord: (id) => {
+        const r = get().attendanceRecords?.find((x) => x.id === id);
+        set((s) => ({
+          attendanceRecords: (s.attendanceRecords || []).filter((x) => x.id !== id),
+        }));
+        if (r) {
+          const w = get().workers?.find((x) => x.id === r.workerId);
+          if (w) get()._addAtividade(`Presença de ${w.name} eliminada`, "obra", r.projectId);
+        }
+      },
+      getAttendanceRecordById: (id) => {
+        return get().attendanceRecords?.find((r) => r.id === id);
+      },
+      bulkUpsertAttendanceRecords: (payloads) => {
+        let created = 0;
+        let updated = 0;
+
+        const now = nowIso();
+        const currentRecords = get().attendanceRecords || [];
+        const nextRecords = [...currentRecords];
+
+        payloads.forEach((payload) => {
+          // Validar referências
+          const worker = get().workers?.find((w) => w.id === payload.workerId);
+          if (!worker) throw new Error(`Trabalhador ${payload.workerId} não encontrado.`);
+          const obra = get().obras?.find((o) => o.id === payload.projectId);
+          if (!obra) throw new Error(`Obra ${payload.projectId} não encontrada.`);
+
+          if (worker.status !== "active") {
+            throw new Error(`Não é possível registar presenças para o trabalhador inativo ${worker.name}.`);
+          }
+          if (obra.estado === "concluida" || obra.estado === "cancelada") {
+            throw new Error(`Não é possível registar presenças para a obra concluída ou cancelada ${obra.nome}.`);
+          }
+
+          const idx = nextRecords.findIndex(
+            (r) => r.workerId === payload.workerId && r.projectId === payload.projectId && r.date === payload.date
+          );
+
+          // Sanitizar payloads de ausência para não guardar horas
+          const targetPayload = { ...payload };
+          if (targetPayload.status === "absent" || targetPayload.status === "justified_absence") {
+            targetPayload.checkInTime = undefined;
+            targetPayload.checkOutTime = undefined;
+            targetPayload.breakMinutes = undefined;
+            targetPayload.workedMinutes = undefined;
+            targetPayload.overtimeMinutes = undefined;
+          }
+
+          if (idx > -1) {
+            const existing = nextRecords[idx]!;
+            const statusChanged = existing.status !== targetPayload.status;
+            const notesChanged = (existing.notes || "") !== (targetPayload.notes || "");
+
+            const checkInChanged = (existing.checkInTime || "") !== (targetPayload.checkInTime || "");
+            const checkOutChanged = (existing.checkOutTime || "") !== (targetPayload.checkOutTime || "");
+            const breakChanged = (existing.breakMinutes || 0) !== (targetPayload.breakMinutes || 0);
+            const workedChanged = (existing.workedMinutes || 0) !== (targetPayload.workedMinutes || 0);
+            const overtimeChanged = (existing.overtimeMinutes || 0) !== (targetPayload.overtimeMinutes || 0);
+
+            if (
+              statusChanged ||
+              notesChanged ||
+              checkInChanged ||
+              checkOutChanged ||
+              breakChanged ||
+              workedChanged ||
+              overtimeChanged
+            ) {
+              nextRecords[idx] = {
+                ...existing,
+                ...targetPayload,
+                updatedAt: now,
+              };
+              updated++;
+            }
+          } else {
+            const record: AttendanceRecord = {
+              ...targetPayload,
+              id: uid(),
+              createdAt: now,
+              updatedAt: now,
+            };
+            nextRecords.unshift(record);
+            created++;
+          }
+        });
+
+        if (created > 0 || updated > 0) {
+          set({ attendanceRecords: nextRecords });
+        }
+
+        return { created, updated };
+      },
+
       resetDemoData: () => set({ ...initialState, _hydrated: true }),
     }),
     {
       name: "obramz-store-v1",
-      storage: createJSONStorage(() =>
-        typeof window !== "undefined"
-          ? window.localStorage
-          : { getItem: () => null, setItem: () => {}, removeItem: () => {} },
-      ),
+      storage: createJSONStorage(() => {
+        if (typeof window === "undefined") {
+          return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+        }
+        return {
+          getItem: (name) => window.localStorage.getItem(name),
+          setItem: (name, value) => {
+            try {
+              window.localStorage.setItem(name, value);
+            } catch (e: any) {
+              console.error("Erro ao guardar no localStorage:", e);
+              if (
+                e.name === "QuotaExceededError" ||
+                e.code === 22 ||
+                e.code === 1014 ||
+                e.message?.toLowerCase().includes("quota") ||
+                e.message?.toLowerCase().includes("exceeded")
+              ) {
+                setTimeout(() => {
+                  import("sonner").then(({ toast }) => {
+                    toast.error("Erro de armazenamento: Limite de espaço excedido no navegador. O progresso foi mantido em memória, mas liberte espaço apagando fotos antigas.");
+                  }).catch(() => {});
+                }, 0);
+              }
+            }
+          },
+          removeItem: (name) => window.localStorage.removeItem(name),
+        };
+      }),
       skipHydration: true,
       partialize: (s) => ({
         clientes: s.clientes,
@@ -704,20 +1321,96 @@ export const useObraMZStore = create<ObraMZState>()(
         atividades: s.atividades,
         empresa: s.empresa,
         utilizador: s.utilizador,
+        workers: s.workers || [],
+        teams: s.teams || [],
+        projectAssignments: s.projectAssignments || [],
+        attendanceRecords: s.attendanceRecords || [],
       }),
     },
   ),
 );
 
+// Função de migração segura e idempotente para atribuições antigas
+const migrateAssignments = (assignments: any[], workers: any[], teams: any[]) => {
+  return (assignments || []).map((a) => {
+    if (a.assignmentType) return a; // Idempotente: já migrada
+
+    // 1. Contém ambos: priorizar trabalhador e alertar
+    if (a.workerId && a.teamId) {
+      console.warn("Atribuição incoerente: contém workerId e teamId. Priorizando integridade de trabalhador.", a);
+      return {
+        ...a,
+        assignmentType: "worker" as const,
+        teamId: undefined,
+        assignedWorkerIds: undefined,
+      };
+    }
+
+    // 2. Contém workerId: marcar como worker
+    if (a.workerId) {
+      return {
+        ...a,
+        assignmentType: "worker" as const,
+        teamId: undefined,
+        assignedWorkerIds: undefined,
+      };
+    }
+
+    // 3. Contém teamId: marcar como team e gerar snapshot
+    if (a.teamId) {
+      let assignedWorkerIds = a.assignedWorkerIds;
+      if (!assignedWorkerIds) {
+        const team = teams?.find((t) => t.id === a.teamId);
+        if (team) {
+          const activeMembers = workers
+            .filter((w) => w.status === "active" && team.workerIds.includes(w.id))
+            .map((w) => w.id);
+          assignedWorkerIds = Array.from(new Set(activeMembers));
+        } else {
+          assignedWorkerIds = [];
+        }
+      }
+      return {
+        ...a,
+        assignmentType: "team" as const,
+        workerId: undefined,
+        assignedWorkerIds,
+      };
+    }
+
+    // 4. Nenhum dos dois: entrada corrompida
+    console.warn("Atribuição corrompida detetada durante a migração.", a);
+    return {
+      ...a,
+      assignmentType: "worker" as const,
+      workerId: "invalid-orphan",
+      teamId: undefined,
+      assignedWorkerIds: undefined,
+    };
+  });
+};
+
 // Rehydrate manualmente no cliente (evita mismatch SSR ↔ CSR)
 if (typeof window !== "undefined") {
   useObraMZStore.persist.rehydrate()?.then?.(() => {
-    useObraMZStore.setState({ _hydrated: true });
+    const state = useObraMZStore.getState();
+    const migrated = migrateAssignments(state.projectAssignments, state.workers, state.teams);
+    useObraMZStore.setState({
+      projectAssignments: migrated,
+      attendanceRecords: state.attendanceRecords || [],
+      _hydrated: true,
+    });
   });
   // fallback
   setTimeout(() => {
     if (!useObraMZStore.getState()._hydrated) {
-      useObraMZStore.setState({ _hydrated: true });
+      const state = useObraMZStore.getState();
+      const migrated = migrateAssignments(state.projectAssignments, state.workers, state.teams);
+      useObraMZStore.setState({
+        projectAssignments: migrated,
+        attendanceRecords: state.attendanceRecords || [],
+        _hydrated: true,
+      });
     }
   }, 0);
 }

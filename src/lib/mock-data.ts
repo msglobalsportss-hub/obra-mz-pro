@@ -15,6 +15,80 @@ export type Cliente = {
   criadoEm: string;
 };
 
+export type WorkerStatus = "active" | "inactive";
+export type PaymentType = "daily" | "hourly" | "monthly";
+
+export interface Worker {
+  id: string;
+  name: string;
+  phone?: string;
+  role: string;
+  photo?: string;
+  status: WorkerStatus;
+  hireDate?: string;
+  paymentType: PaymentType;
+  dailyRate?: number;
+  hourlyRate?: number;
+  monthlyRate?: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+
+  // Novos campos opcionais da Sprint 2
+  email?: string;
+  dateOfBirth?: string;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say";
+  documentType?: "bi" | "passport" | "dire" | "other";
+  documentNumber?: string;
+  address?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  nationality?: string;
+  employeeCode?: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  leaderWorkerId?: string;
+  workerIds: string[];
+  status: "active" | "inactive";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectAssignment {
+  id: string;
+  projectId: string;
+  workerId?: string;
+  phaseId?: string;
+  startDate: string;
+  endDate?: string;
+  status: "active" | "completed" | "cancelled";
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+
+  // Novos campos da Sprint 3.2
+  assignmentType: "worker" | "team";
+  teamId?: string;
+  assignedWorkerIds?: string[];
+}
+
+export const roles = [
+  "Pedreiro",
+  "Servente",
+  "Carpinteiro",
+  "Eletricista",
+  "Canalizador",
+  "Pintor",
+  "Encarregado de Obra",
+  "Engenheiro Civil",
+  "Mestre de Obras",
+  "Outra",
+];
+
 export type EstadoObra = "planeada" | "em_andamento" | "suspensa" | "concluida" | "cancelada";
 
 export type TimelineEventoTipo =
@@ -41,6 +115,17 @@ export type ObraFoto = {
   legenda?: string;
   data: string;
   criadoEm: string;
+  projectId?: string;
+  phaseId?: string;
+  titulo?: string;
+  descricao?: string;
+  categoria?: string;
+  latitude?: number;
+  longitude?: number;
+  localizacaoNome?: string;
+  tipo?: "normal" | "antes" | "depois";
+  beforeAfterGroupId?: string;
+  createdAt?: string;
 };
 
 export type EstadoFase = "pendente" | "em_andamento" | "concluida";
@@ -245,4 +330,30 @@ export function totalOrcamento(o: Orcamento): { subtotal: number; total: number 
   );
   const total = subtotal - o.descontoGeral + o.imposto + o.custosAdicionais;
   return { subtotal, total: Math.max(0, total) };
+}
+
+export type AttendanceStatus =
+  | "present"
+  | "absent"
+  | "late"
+  | "half_day"
+  | "justified_absence";
+
+export interface AttendanceRecord {
+  id: string;
+  projectId: string;
+  phaseId?: string;
+  workerId: string;
+  teamId?: string;
+  assignmentId?: string;
+  date: string;
+  status: AttendanceStatus;
+  notes?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  breakMinutes?: number;
+  workedMinutes?: number;
+  overtimeMinutes?: number;
+  createdAt: string;
+  updatedAt: string;
 }

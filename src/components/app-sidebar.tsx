@@ -1,7 +1,8 @@
+import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, Users, HardHat, FileText, Wallet, BarChart3,
-  Building2, Settings, LogOut, HelpCircle,
+  Building2, Settings, LogOut, HelpCircle, Briefcase, CalendarCheck, ChevronDown, ChevronRight,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
@@ -29,6 +30,16 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const empresa = useObraMZStore((s) => s.empresa);
   const utilizador = useObraMZStore((s) => s.utilizador);
+
+  const isOperacoesActive = pathname.startsWith("/app/equipas") || pathname.startsWith("/app/presencas");
+  const [operacoesOpen, setOperacoesOpen] = useState(isOperacoesActive);
+
+  useEffect(() => {
+    if (isOperacoesActive) {
+      setOperacoesOpen(true);
+    }
+  }, [pathname, isOperacoesActive]);
+
   const isActive = (url: string, exact?: boolean) =>
     exact ? pathname === url : pathname === url || pathname.startsWith(url + "/");
 
@@ -53,7 +64,72 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-sidebar-foreground/50">Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {items.slice(0, 3).map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url, item.exact)}
+                    tooltip={item.title}
+                    className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
+                  >
+                    <Link to={item.url}>
+                      <item.icon />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+              {/* Operações Collapsible */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setOperacoesOpen(!operacoesOpen)}
+                  tooltip="Operações"
+                  className={`group/op data-[active=true]:bg-primary/10 ${isOperacoesActive ? "font-semibold text-primary" : ""}`}
+                >
+                  <Briefcase />
+                  <span className="flex-1 text-left">Operações</span>
+                  {operacoesOpen ? (
+                    <ChevronDown className="h-3 w-3 shrink-0 ml-auto" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 shrink-0 ml-auto" />
+                  )}
+                </SidebarMenuButton>
+
+                {operacoesOpen && (
+                  <div className="pl-6 pr-1 py-1 space-y-1 border-l border-sidebar-border/60 ml-4 mt-1.5 animate-none group-data-[collapsible=icon]:hidden">
+                    <SidebarMenuItem className="list-none">
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname.startsWith("/app/equipas")}
+                        tooltip="Equipas"
+                        className="h-8 text-xs data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
+                      >
+                        <Link to="/app/equipas">
+                          <Briefcase className="h-3.5 w-3.5 mr-2" />
+                          <span>Equipas</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem className="list-none">
+                      <SidebarMenuButton
+                        asChild
+                        isActive={pathname.startsWith("/app/presencas")}
+                        tooltip="Presenças"
+                        className="h-8 text-xs data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:hover:bg-primary/90"
+                      >
+                        <Link to="/app/presencas">
+                          <CalendarCheck className="h-3.5 w-3.5 mr-2" />
+                          <span>Presenças</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </div>
+                )}
+              </SidebarMenuItem>
+
+              {items.slice(3).map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild

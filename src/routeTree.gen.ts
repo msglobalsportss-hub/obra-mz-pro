@@ -17,9 +17,11 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app.index'
 import { Route as AppRelatoriosIndexRouteImport } from './routes/app.relatorios.index'
+import { Route as AppPresencasIndexRouteImport } from './routes/app.presencas.index'
 import { Route as AppPagamentosIndexRouteImport } from './routes/app.pagamentos.index'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/app.orcamentos.index'
 import { Route as AppObrasIndexRouteImport } from './routes/app.obras.index'
+import { Route as AppEquipasIndexRouteImport } from './routes/app.equipas.index'
 import { Route as AppEmpresaIndexRouteImport } from './routes/app.empresa.index'
 import { Route as AppConfiguracoesIndexRouteImport } from './routes/app.configuracoes.index'
 import { Route as AppClientesIndexRouteImport } from './routes/app.clientes.index'
@@ -68,6 +70,11 @@ const AppRelatoriosIndexRoute = AppRelatoriosIndexRouteImport.update({
   path: '/relatorios/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPresencasIndexRoute = AppPresencasIndexRouteImport.update({
+  id: '/presencas/',
+  path: '/presencas/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPagamentosIndexRoute = AppPagamentosIndexRouteImport.update({
   id: '/pagamentos/',
   path: '/pagamentos/',
@@ -81,6 +88,11 @@ const AppOrcamentosIndexRoute = AppOrcamentosIndexRouteImport.update({
 const AppObrasIndexRoute = AppObrasIndexRouteImport.update({
   id: '/obras/',
   path: '/obras/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEquipasIndexRoute = AppEquipasIndexRouteImport.update({
+  id: '/equipas/',
+  path: '/equipas/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppEmpresaIndexRoute = AppEmpresaIndexRouteImport.update({
@@ -134,9 +146,11 @@ export interface FileRoutesByFullPath {
   '/app/clientes/': typeof AppClientesIndexRoute
   '/app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/app/empresa/': typeof AppEmpresaIndexRoute
+  '/app/equipas/': typeof AppEquipasIndexRoute
   '/app/obras/': typeof AppObrasIndexRoute
   '/app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/app/pagamentos/': typeof AppPagamentosIndexRoute
+  '/app/presencas/': typeof AppPresencasIndexRoute
   '/app/relatorios/': typeof AppRelatoriosIndexRoute
 }
 export interface FileRoutesByTo {
@@ -153,9 +167,11 @@ export interface FileRoutesByTo {
   '/app/clientes': typeof AppClientesIndexRoute
   '/app/configuracoes': typeof AppConfiguracoesIndexRoute
   '/app/empresa': typeof AppEmpresaIndexRoute
+  '/app/equipas': typeof AppEquipasIndexRoute
   '/app/obras': typeof AppObrasIndexRoute
   '/app/orcamentos': typeof AppOrcamentosIndexRoute
   '/app/pagamentos': typeof AppPagamentosIndexRoute
+  '/app/presencas': typeof AppPresencasIndexRoute
   '/app/relatorios': typeof AppRelatoriosIndexRoute
 }
 export interface FileRoutesById {
@@ -174,9 +190,11 @@ export interface FileRoutesById {
   '/app/clientes/': typeof AppClientesIndexRoute
   '/app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/app/empresa/': typeof AppEmpresaIndexRoute
+  '/app/equipas/': typeof AppEquipasIndexRoute
   '/app/obras/': typeof AppObrasIndexRoute
   '/app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/app/pagamentos/': typeof AppPagamentosIndexRoute
+  '/app/presencas/': typeof AppPresencasIndexRoute
   '/app/relatorios/': typeof AppRelatoriosIndexRoute
 }
 export interface FileRouteTypes {
@@ -196,9 +214,11 @@ export interface FileRouteTypes {
     | '/app/clientes/'
     | '/app/configuracoes/'
     | '/app/empresa/'
+    | '/app/equipas/'
     | '/app/obras/'
     | '/app/orcamentos/'
     | '/app/pagamentos/'
+    | '/app/presencas/'
     | '/app/relatorios/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -215,9 +235,11 @@ export interface FileRouteTypes {
     | '/app/clientes'
     | '/app/configuracoes'
     | '/app/empresa'
+    | '/app/equipas'
     | '/app/obras'
     | '/app/orcamentos'
     | '/app/pagamentos'
+    | '/app/presencas'
     | '/app/relatorios'
   id:
     | '__root__'
@@ -235,9 +257,11 @@ export interface FileRouteTypes {
     | '/app/clientes/'
     | '/app/configuracoes/'
     | '/app/empresa/'
+    | '/app/equipas/'
     | '/app/obras/'
     | '/app/orcamentos/'
     | '/app/pagamentos/'
+    | '/app/presencas/'
     | '/app/relatorios/'
   fileRoutesById: FileRoutesById
 }
@@ -308,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRelatoriosIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/presencas/': {
+      id: '/app/presencas/'
+      path: '/presencas'
+      fullPath: '/app/presencas/'
+      preLoaderRoute: typeof AppPresencasIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/pagamentos/': {
       id: '/app/pagamentos/'
       path: '/pagamentos'
@@ -327,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/obras'
       fullPath: '/app/obras/'
       preLoaderRoute: typeof AppObrasIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/equipas/': {
+      id: '/app/equipas/'
+      path: '/equipas'
+      fullPath: '/app/equipas/'
+      preLoaderRoute: typeof AppEquipasIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/empresa/': {
@@ -390,9 +428,11 @@ interface AppRouteChildren {
   AppClientesIndexRoute: typeof AppClientesIndexRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
   AppEmpresaIndexRoute: typeof AppEmpresaIndexRoute
+  AppEquipasIndexRoute: typeof AppEquipasIndexRoute
   AppObrasIndexRoute: typeof AppObrasIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
   AppPagamentosIndexRoute: typeof AppPagamentosIndexRoute
+  AppPresencasIndexRoute: typeof AppPresencasIndexRoute
   AppRelatoriosIndexRoute: typeof AppRelatoriosIndexRoute
 }
 
@@ -405,9 +445,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppClientesIndexRoute: AppClientesIndexRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
   AppEmpresaIndexRoute: AppEmpresaIndexRoute,
+  AppEquipasIndexRoute: AppEquipasIndexRoute,
   AppObrasIndexRoute: AppObrasIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
   AppPagamentosIndexRoute: AppPagamentosIndexRoute,
+  AppPresencasIndexRoute: AppPresencasIndexRoute,
   AppRelatoriosIndexRoute: AppRelatoriosIndexRoute,
 }
 
@@ -424,3 +466,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

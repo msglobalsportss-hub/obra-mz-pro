@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import {
   totalOrcamento, estadoObraLabel, estadoOrcamentoLabel, metodoPagamentoLabel,
-  type EstadoObra,
+  type EstadoObra, type ObraFoto,
 } from "@/lib/mock-data";
 import { formatDate, formatMZN } from "@/lib/format";
 import { StatCard } from "@/components/stat-card";
@@ -24,6 +24,8 @@ import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { TimelineEditor } from "@/components/projects/timeline-editor";
 import { PhotoGallery } from "@/components/projects/photo-gallery";
 import { PhasesEditor } from "@/components/projects/phases-editor";
+import { PhotoComparison } from "@/components/projects/photo-comparison";
+import { PhotoDetailDialog } from "@/components/projects/photo-detail-dialog";
 import { toast } from "sonner";
 
 
@@ -51,6 +53,7 @@ function ObraDetalhe() {
   const [payOpen, setPayOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [progresso, setProgresso] = useState<number | null>(null);
+  const [detailPhoto, setDetailPhoto] = useState<ObraFoto | null>(null);
 
   if (!obra) {
     return (
@@ -63,6 +66,7 @@ function ObraDetalhe() {
 
   const t = totalsPorObra(obra.id);
   const currentProg = progresso ?? obra.progresso;
+  const antesFotosCount = (obra.fotos ?? []).filter((f) => f.tipo === "antes").length;
 
   const saveProgresso = () => {
     if (progresso !== null && progresso !== obra.progresso) {
@@ -152,6 +156,7 @@ function ObraDetalhe() {
           <TabsTrigger value="overview">Visão geral</TabsTrigger>
           <TabsTrigger value="diario">Diário ({(obra.eventos ?? []).length})</TabsTrigger>
           <TabsTrigger value="fotos">Fotografias ({(obra.fotos ?? []).length})</TabsTrigger>
+          <TabsTrigger value="antes-depois">Antes e depois ({antesFotosCount})</TabsTrigger>
           <TabsTrigger value="fases">Fases ({(obra.fases ?? []).length})</TabsTrigger>
           <TabsTrigger value="orcamentos">Orçamentos ({orcamentos.length})</TabsTrigger>
           <TabsTrigger value="pagamentos">Pagamentos ({pagamentos.length})</TabsTrigger>
@@ -194,6 +199,16 @@ function ObraDetalhe() {
         <TabsContent value="fotos" className="mt-4">
           <Card className="p-5">
             <PhotoGallery obraId={obra.id} fotos={obra.fotos ?? []} />
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="antes-depois" className="mt-4">
+          <Card className="p-5">
+            <PhotoComparison
+              fotos={obra.fotos ?? []}
+              fases={obra.fases ?? []}
+              onOpenDetail={setDetailPhoto}
+            />
           </Card>
         </TabsContent>
 
@@ -248,6 +263,13 @@ function ObraDetalhe() {
         open={payOpen}
         onOpenChange={setPayOpen}
         defaults={{ clienteId: obra.clienteId, obraId: obra.id }}
+      />
+      <PhotoDetailDialog
+        open={!!detailPhoto}
+        onOpenChange={(o) => !o && setDetailPhoto(null)}
+        photo={detailPhoto}
+        fases={obra.fases ?? []}
+        allPhotos={obra.fotos ?? []}
       />
       <ConfirmDialog
         open={confirmDel}
