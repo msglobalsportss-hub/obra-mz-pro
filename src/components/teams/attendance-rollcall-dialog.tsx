@@ -15,6 +15,7 @@ import { Search, Calendar, AlertCircle, Users, Check, X, Clock, HelpCircle, User
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { calculateWorkedMinutes, validateTimeFields, formatMins } from "@/lib/time-utils";
+import { resolveWorkersScheduledForDate, type AttendanceSchedule } from "@/lib/attendance-schedule";
 
 type AttendanceRollCallDialogProps = {
   open: boolean;
@@ -25,7 +26,8 @@ type AttendanceRollCallDialogProps = {
 
 interface RollCallWorkerItem {
   worker: Worker;
-  assignment: ProjectAssignment;
+  assignment?: ProjectAssignment;
+  schedule?: AttendanceSchedule;
   team?: Team;
   status: AttendanceStatus;
   notes: string;
@@ -53,6 +55,7 @@ export function AttendanceRollCallDialog({
   const obras = useObraMZStore((s) => s.obras || []);
   const teams = useObraMZStore((s) => s.teams || []);
   const projectAssignments = useObraMZStore((s) => s.projectAssignments || []);
+  const attendanceSchedules = useObraMZStore((s) => s.attendanceSchedules || []);
   const attendanceRecords = useObraMZStore((s) => s.attendanceRecords || []);
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -86,51 +89,25 @@ export function AttendanceRollCallDialog({
     });
   }, [selectableObras, projectSearch]);
 
-  // 1. Carregar operários elegíveis dinamicamente
+  // 1. Carregar operários elegíveis dinamicamente via resolveWorkersScheduledForDate
   const eligibleWorkers = useMemo(() => {
     if (!date || !projectId) return [];
 
-    // Apenas ativos
-    const activeWorkers = workers.filter((w) => w.status === "active" && w.id !== "invalid-orphan");
+    const resolved = resolveWorkersScheduledForDate(
+      projectId,
+      date,
+      attendanceSchedules,
+      projectAssignments,
+      workers,
+      teams
+    );
 
-    const list: { worker: Worker; assignment: ProjectAssignment; team?: Team }[] = [];
-
-    activeWorkers.forEach((w) => {
-      // Regra A: Atribuição individual
-      let matchingAssign = projectAssignments.find((a) => {
-        if (a.status !== "active") return false;
-        if (a.projectId !== projectId) return false;
-
-        const sDate = a.startDate;
-        const eDate = a.endDate || "9999-12-31";
-        if (date < sDate || date > eDate) return false;
-
-        return a.assignmentType === "worker" && a.workerId === w.id;
-      });
-
-      // Regra B: Atribuição de equipa (via snapshot)
-      if (!matchingAssign) {
-        matchingAssign = projectAssignments.find((a) => {
-          if (a.status !== "active") return false;
-          if (a.projectId !== projectId) return false;
-
-          const sDate = a.startDate;
-          const eDate = a.endDate || "9999-12-31";
-          if (date < sDate || date > eDate) return false;
-
-          return a.assignmentType === "team" && a.assignedWorkerIds?.includes(w.id);
-        });
-      }
-
-      if (matchingAssign) {
-        const team = matchingAssign.assignmentType === "team" ? teams.find((t) => t.id === matchingAssign.teamId) : undefined;
-        list.push({
-          worker: w,
-          assignment: matchingAssign,
-          team,
-        });
-      }
-    });
+    const list = resolved.map((r) => ({
+      worker: r.worker,
+      assignment: r.assignment,
+      schedule: r.schedule,
+      team: r.team,
+    }));
 
     // Ordenação: Equipa (Individual por último) e Nome do Trabalhador
     return list.sort((a, b) => {
@@ -140,7 +117,7 @@ export function AttendanceRollCallDialog({
       if (teamCompare !== 0) return teamCompare;
       return a.worker.name.localeCompare(b.worker.name, "pt-PT");
     });
-  }, [date, projectId, workers, projectAssignments, teams]);
+  }, [date, projectId, attendanceSchedules, projectAssignments, workers, teams]);
 
   // 2. Mapear trabalhadores elegíveis para itens de chamada (se existirem na base de dados, carrega status; senão, inicia como "present")
   useEffect(() => {
@@ -324,7 +301,7 @@ export function AttendanceRollCallDialog({
         phaseId: undefined, // Sem fase na chamada em massa por defeito
         workerId: item.worker.id,
         teamId: item.team?.id,
-        assignmentId: item.assignment.id,
+        assignmentId: item.assignment?.id || item.schedule?.assignmentId,
         date,
         status: item.status,
         notes: item.notes.trim() || undefined,

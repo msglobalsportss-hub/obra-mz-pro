@@ -3,8 +3,9 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   Cliente, Obra, ObraEvento, ObraFoto, ObraFase, Orcamento, OrcamentoHistorico, Pagamento,
   Atividade, Empresa, Utilizador, EstadoOrcamento, EstadoObra, Worker, Team, ProjectAssignment,
-  AttendanceStatus, AttendanceRecord,
+  AttendanceStatus, AttendanceRecord, AttendanceSchedule,
 } from "@/lib/mock-data";
+import { validateScheduleOverlap } from "@/lib/attendance-schedule";
 
 import { totalOrcamento } from "@/lib/mock-data";
 
@@ -1279,6 +1280,118 @@ export const useObraMZStore = create<ObraMZState>()(
         return { created, updated };
       },
 
+      addAttendanceSchedule: (data) => {
+        const currentSchedules = get().attendanceSchedules || [];
+        const validation = validateScheduleOverlap(data, currentSchedules);
+        if (!validation.valid) {
+          throw new Error("Já existe uma escala de presença ativa para este trabalhador nesta obra no período selecionado.");
+        }
+
+        const now = nowIso();
+        const schedule: AttendanceSchedule = {
+          ...data,
+          id: uid(),
+          workingDays: data.workingDays || ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          excludedDates: data.excludedDates || [],
+          includedDates: data.includedDates || [],
+          status: data.status || "active",
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        set((s) => ({
+          attendanceSchedules: [schedule, ...(s.attendanceSchedules || [])],
+        }));
+
+        return schedule;
+      },
+
+      updateAttendanceSchedule: (id, patch) => {
+        const currentSchedules = get().attendanceSchedules || [];
+        const existing = currentSchedules.find((s) => s.id === id);
+        if (!existing) throw new Error("Escala de presença não encontrada.");
+
+        const updatedCandidate = { ...existing, ...patch };
+        const validation = validateScheduleOverlap(updatedCandidate, currentSchedules, id);
+        if (!validation.valid) {
+          throw new Error("Já existe uma escala de presença ativa para este trabalhador nesta obra no período selecionado.");
+        }
+
+        set((s) => ({
+          attendanceSchedules: (s.attendanceSchedules || []).map((item) =>
+            item.id === id ? { ...updatedCandidate, updatedAt: nowIso() } : item
+          ),
+        }));
+      },
+
+      deleteAttendanceSchedule: (id) => {
+        set((s) => ({
+          attendanceSchedules: (s.attendanceSchedules || []).filter((item) => item.id !== id),
+        }));
+      },
+
+      getAttendanceSchedulesByProject: (projectId) => {
+        return (get().attendanceSchedules || []).filter(
+          (s) => s.projectId === projectId && s.status === "active"
+        );
+      },
+
+      bulkAddTeamAttendanceSchedules: (teamId, projectId, scheduleData) => {
+        const team = get().teams?.find((t) => t.id === teamId);
+        if (!team) throw new Error("Equipa não encontrada.");
+
+        const activeWorkers = (get().workers || []).filter(
+          (w) => w.status === "active" && team.workerIds.includes(w.id)
+        );
+
+        if (activeWorkers.length === 0) {
+          throw new Error("Esta equipa não possui trabalhadores ativos para criar escalas.");
+        }
+
+        const currentSchedules = get().attendanceSchedules || [];
+        const conflictingWorkers: string[] = [];
+
+        for (const w of activeWorkers) {
+          const candidate = {
+            ...scheduleData,
+            projectId,
+            workerId: w.id,
+            teamId,
+          };
+          const validation = validateScheduleOverlap(candidate, currentSchedules);
+          if (!validation.valid) {
+            conflictingWorkers.push(w.name);
+          }
+        }
+
+        if (conflictingWorkers.length > 0) {
+          throw new Error(
+            `Conflito de escala detetado para os seguintes trabalhadores: ${conflictingWorkers.join(", ")}. Nenhuma escala foi criada.`
+          );
+        }
+
+        const now = nowIso();
+        const newSchedules: AttendanceSchedule[] = activeWorkers.map((w) => ({
+          ...scheduleData,
+          id: uid(),
+          projectId,
+          workerId: w.id,
+          teamId,
+          workingDays: scheduleData.workingDays || ["monday", "tuesday", "wednesday", "thursday", "friday"],
+          excludedDates: scheduleData.excludedDates || [],
+          includedDates: scheduleData.includedDates || [],
+          status: scheduleData.status || "active",
+          createdAt: now,
+          updatedAt: now,
+        }));
+
+        set((s) => ({
+          attendanceSchedules: [...newSchedules, ...(s.attendanceSchedules || [])],
+        }));
+
+        return newSchedules;
+      },
+
       resetDemoData: () => set({ ...initialState, _hydrated: true }),
     }),
     {
@@ -1325,6 +1438,7 @@ export const useObraMZStore = create<ObraMZState>()(
         teams: s.teams || [],
         projectAssignments: s.projectAssignments || [],
         attendanceRecords: s.attendanceRecords || [],
+        attendanceSchedules: s.attendanceSchedules || [],
       }),
     },
   ),
@@ -1390,14 +1504,27 @@ const migrateAssignments = (assignments: any[], workers: any[], teams: any[]) =>
   });
 };
 
+// Função de migração segura e idempotente para escalas de presença
+const migrateSchedules = (schedules: any[]) => {
+  return (schedules || []).map((s) => ({
+    ...s,
+    workingDays: s.workingDays || ["monday", "tuesday", "wednesday", "thursday", "friday"],
+    excludedDates: s.excludedDates || [],
+    includedDates: s.includedDates || [],
+    status: s.status || "active",
+  }));
+};
+
 // Rehydrate manualmente no cliente (evita mismatch SSR ↔ CSR)
 if (typeof window !== "undefined") {
   useObraMZStore.persist.rehydrate()?.then?.(() => {
     const state = useObraMZStore.getState();
     const migrated = migrateAssignments(state.projectAssignments, state.workers, state.teams);
+    const migratedSchedules = migrateSchedules(state.attendanceSchedules || []);
     useObraMZStore.setState({
       projectAssignments: migrated,
       attendanceRecords: state.attendanceRecords || [],
+      attendanceSchedules: migratedSchedules,
       _hydrated: true,
     });
   });
@@ -1406,9 +1533,11 @@ if (typeof window !== "undefined") {
     if (!useObraMZStore.getState()._hydrated) {
       const state = useObraMZStore.getState();
       const migrated = migrateAssignments(state.projectAssignments, state.workers, state.teams);
+      const migratedSchedules = migrateSchedules(state.attendanceSchedules || []);
       useObraMZStore.setState({
         projectAssignments: migrated,
         attendanceRecords: state.attendanceRecords || [],
+        attendanceSchedules: migratedSchedules,
         _hydrated: true,
       });
     }

@@ -22,6 +22,8 @@ import { AttendanceKpiCard } from "@/components/teams/attendance-kpi-card";
 import { AttendanceSummaryCard, formatCurrencyAbbreviated } from "@/components/teams/attendance-summary-card";
 import { AttendanceFilterToolbar } from "@/components/teams/attendance-filter-toolbar";
 import { AttendanceAdvancedFilterSheet } from "@/components/teams/attendance-advanced-filter-sheet";
+import { AttendanceScheduleList } from "@/components/teams/attendance-schedule-list";
+import { AttendanceScheduleFormDialog } from "@/components/teams/attendance-schedule-form-dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
@@ -69,6 +71,7 @@ function PresencasPage() {
   const workers = useObraMZStore((s) => s.workers || []);
   const obras = useObraMZStore((s) => s.obras || []);
   const teams = useObraMZStore((s) => s.teams || []);
+  const attendanceSchedules = useObraMZStore((s) => s.attendanceSchedules || []);
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -107,6 +110,8 @@ function PresencasPage() {
 
   // Modais
   const [formOpen, setFormOpen] = useState(false);
+  const [mainTab, setMainTab] = useState<"presencas" | "escalas">("presencas");
+  const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [rollCallOpen, setRollCallOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedEdit, setSelectedEdit] = useState<AttendanceRecord | null>(null);
@@ -413,9 +418,22 @@ function PresencasPage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         title="Presenças"
-        description="Registe e controle a presença diária dos trabalhadores alocados a cada obra."
+        description="Registe e controle a presença diária e as escalas de trabalho dos trabalhadores alocados a cada obra."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={() => setMainTab(mainTab === "presencas" ? "escalas" : "presencas")}
+              variant={mainTab === "escalas" ? "default" : "outline"}
+              className="gap-2 text-xs border-border/80"
+            >
+              <Calendar className="h-4 w-4" />
+              {mainTab === "escalas" ? "Ver Dashboard" : "Escalas de Presença"}
+              {attendanceSchedules.filter((s) => s.status === "active").length > 0 && (
+                <Badge variant="secondary" className="text-[10px] ml-0.5 px-1.5 py-0 bg-primary/10 text-primary font-bold">
+                  {attendanceSchedules.filter((s) => s.status === "active").length}
+                </Badge>
+              )}
+            </Button>
             <Button
               onClick={() => setHistoryOpen(true)}
               variant="outline"
@@ -447,6 +465,11 @@ function PresencasPage() {
           </div>
         }
       />
+
+      {mainTab === "escalas" ? (
+        <AttendanceScheduleList onOpenNewScheduleForm={() => setScheduleFormOpen(true)} />
+      ) : (
+        <>
 
       {/* Cartões de KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
@@ -810,6 +833,8 @@ function PresencasPage() {
           </div>
         </>
       )}
+        </>
+      )}
 
       {/* Diálogos */}
       <AttendanceFormDialog
@@ -838,6 +863,11 @@ function PresencasPage() {
         open={!!selectedDetails}
         onOpenChange={(o) => { if (!o) setSelectedDetails(null); }}
         record={selectedDetails}
+      />
+
+      <AttendanceScheduleFormDialog
+        open={scheduleFormOpen}
+        onOpenChange={setScheduleFormOpen}
       />
 
       <ConfirmDialog
