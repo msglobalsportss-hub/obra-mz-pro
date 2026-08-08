@@ -26,10 +26,13 @@ export interface Worker {
   photo?: string;
   status: WorkerStatus;
   hireDate?: string;
-  paymentType: PaymentType;
+  paymentType?: PaymentType;
   dailyRate?: number;
   hourlyRate?: number;
   monthlyRate?: number;
+  overtimeHourlyRate?: number;
+  currency?: string;
+  defaultWorkingHours?: number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -324,11 +327,13 @@ export const tipoEventoLabel: Record<TimelineEventoTipo, string> = {
 };
 
 export function totalOrcamento(o: Orcamento): { subtotal: number; total: number } {
-  const subtotal = o.itens.reduce(
-    (s, i) => s + Math.max(0, i.quantidade) * Math.max(0, i.precoUnitario) - Math.max(0, i.desconto),
+  if (!o) return { subtotal: 0, total: 0 };
+  const itens = Array.isArray(o.itens) ? o.itens : [];
+  const subtotal = itens.reduce(
+    (s, i) => s + Math.max(0, i?.quantidade || 0) * Math.max(0, i?.precoUnitario || 0) - Math.max(0, i?.desconto || 0),
     0,
   );
-  const total = subtotal - o.descontoGeral + o.imposto + o.custosAdicionais;
+  const total = subtotal - (o.descontoGeral || 0) + (o.imposto || 0) + (o.custosAdicionais || 0);
   return { subtotal, total: Math.max(0, total) };
 }
 
@@ -354,6 +359,80 @@ export interface AttendanceRecord {
   breakMinutes?: number;
   workedMinutes?: number;
   overtimeMinutes?: number;
+
+  // Horas calculadas
+  regularHours?: number;
+  overtimeHours?: number;
+  workedHours?: number;
+
+  // Custos calculados de mão de obra
+  regularLabourCost?: number;
+  overtimeLabourCost?: number;
+  labourCost?: number;
+
+  // Snapshots de remuneração
+  paymentTypeSnapshot?: PaymentType;
+  dailyRateSnapshot?: number;
+  hourlyRateSnapshot?: number;
+  monthlyRateSnapshot?: number;
+  overtimeHourlyRateSnapshot?: number;
+  currencySnapshot?: string;
+  defaultWorkingHoursSnapshot?: number;
+
+  // Metadados de cálculo
+  costCalculatedAt?: string;
+  costCalculationVersion?: number;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DisabledDayRecord {
+  id: string;
+  projectId: string;
+  date: string;
+  reason: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface MaterialCategory {
+  id: string;
+  name: string;
+  description?: string;
+  status: "active" | "inactive";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MaterialUnit {
+  id: string;
+  name: string;
+  symbol: string;
+  type?: string;
+  precision?: number;
+  status: "active" | "inactive";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Material {
+  id: string;
+  name: string;
+  internalCode?: string;
+  sku?: string;
+  categoryId: string;
+  unitId: string;
+  description?: string;
+  referencePrice?: number;
+  averagePrice?: number;
+  currency?: string;
+  minimumStock?: number;
+  preferredBrand?: string;
+  specifications?: string;
+  imageUrl?: string;
+  status: "active" | "inactive";
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -365,3 +444,10 @@ export type {
   AttendanceScheduleDayState,
   ScheduledWorkerResult,
 } from "./attendance-schedule/attendance-schedule-types";
+
+export type {
+  Supplier,
+  SupplierMaterial,
+  SupplierPriceHistory,
+  PaymentTermType,
+} from "./suppliers/supplier-types";

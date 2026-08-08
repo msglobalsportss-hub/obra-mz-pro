@@ -15,6 +15,7 @@ import { useObraMZStore, metricasGlobais } from "@/store/obramz-store";
 import { PaymentFormDialog } from "@/components/payments/payment-form-dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { EmptyState } from "@/components/common/empty-state";
+import { PageContainer } from "@/components/shared/page-container";
 
 export const Route = createFileRoute("/app/pagamentos/")({ component: PagamentosPage });
 
@@ -59,12 +60,13 @@ function PagamentosPage() {
   const openEdit = (p: Pagamento) => { setEditing(p); setOpen(true); };
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
         title="Pagamentos"
-        description="Controlo dos pagamentos recebidos."
+        description="Registo de recebimentos de clientes, adiantamentos e controlo de liquidez."
+        breadcrumbs={[{ label: "Pagamentos" }]}
         actions={
-          <Button className="bg-primary hover:bg-primary-dark" onClick={openNew}>
+          <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm text-xs font-semibold" onClick={openNew}>
             <Plus className="mr-1 h-4 w-4" />Registar pagamento
           </Button>
         }
@@ -186,7 +188,7 @@ function PagamentosPage() {
           }
         }}
       />
-    </div>
+    </PageContainer>
   );
 }
 

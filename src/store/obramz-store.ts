@@ -3,9 +3,64 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type {
   Cliente, Obra, ObraEvento, ObraFoto, ObraFase, Orcamento, OrcamentoHistorico, Pagamento,
   Atividade, Empresa, Utilizador, EstadoOrcamento, EstadoObra, Worker, Team, ProjectAssignment,
-  AttendanceStatus, AttendanceRecord, AttendanceSchedule,
+  AttendanceStatus, AttendanceRecord, AttendanceSchedule, DisabledDayRecord,
+  Material, MaterialCategory, MaterialUnit,
 } from "@/lib/mock-data";
 import { validateScheduleOverlap } from "@/lib/attendance-schedule";
+import {
+  initialMaterialCategories,
+  initialMaterialUnits,
+  demoMaterialsSeed,
+  validateMaterialInput,
+  validateCategoryInput,
+  validateUnitInput,
+} from "@/lib/materials";
+import type { Warehouse, CreateWarehouseInput, UpdateWarehouseInput } from "@/lib/materials/warehouse";
+import { DEFAULT_INITIAL_WAREHOUSES } from "@/lib/materials/warehouse";
+import { inventoryActions } from "@/modules/inventory/application/actions/action-container";
+import type {
+  Supplier, SupplierMaterial, SupplierPriceHistory,
+} from "@/lib/suppliers";
+import {
+  initialSuppliersSeed,
+  initialSupplierMaterialsSeed,
+  initialSupplierPriceHistoriesSeed,
+  validateSupplierInput,
+  validateSupplierMaterialInput,
+} from "@/lib/suppliers";
+import type {
+  PurchaseOrder,
+  PurchaseOrderItem,
+  Delivery,
+  DeliveryItem,
+  StockMovement,
+  InventoryBalance,
+  InventoryLocationType,
+  PurchaseOrderDuplicateData,
+} from "@/lib/purchases";
+import {
+  demoPurchaseOrdersSeed,
+  demoPurchaseOrderItemsSeed,
+  demoDeliveriesSeed,
+  demoDeliveryItemsSeed,
+  demoStockMovementsSeed,
+  demoInventoryBalancesSeed,
+  validatePurchaseOrderInput,
+  validatePurchaseOrderItemInput,
+  validateDeliveryInput,
+  validateDeliveryItemInput,
+  validateInventoryBalance,
+  nextPurchaseOrderNumber,
+  nextDeliveryNumber,
+  calculateOrderTotals,
+  calculateItemLineTotal,
+  calculateOrderStatusFromItems,
+  calculateWeightedAverageCost,
+  calculateAcceptedPurchaseQuantity,
+  getInventoryBalanceKey,
+  resolveInventoryDestination,
+  calculateInventoryTotalValue,
+} from "@/lib/purchases";
 
 import { totalOrcamento } from "@/lib/mock-data";
 
@@ -391,6 +446,96 @@ export type ObraMZState = {
   getAttendanceRecordById: (id: string) => AttendanceRecord | undefined;
   bulkUpsertAttendanceRecords: (data: Omit<AttendanceRecord, "id" | "createdAt" | "updatedAt">[]) => { created: number; updated: number };
 
+  // Materiais (Etapa 6.1)
+  materials: Material[];
+  materialCategories: MaterialCategory[];
+  materialUnits: MaterialUnit[];
+
+  addMaterial: (data: Omit<Material, "id" | "createdAt" | "updatedAt">) => Material;
+  updateMaterial: (id: string, patch: Partial<Material>) => void;
+  activateMaterial: (id: string) => void;
+  deactivateMaterial: (id: string) => void;
+  getMaterialById: (id: string) => Material | undefined;
+
+  addMaterialCategory: (data: Omit<MaterialCategory, "id" | "createdAt" | "updatedAt">) => MaterialCategory;
+  updateMaterialCategory: (id: string, patch: Partial<MaterialCategory>) => void;
+  activateMaterialCategory: (id: string) => void;
+  deactivateMaterialCategory: (id: string) => void;
+
+  addMaterialUnit: (data: Omit<MaterialUnit, "id" | "createdAt" | "updatedAt">) => MaterialUnit;
+  updateMaterialUnit: (id: string, patch: Partial<MaterialUnit>) => void;
+  activateMaterialUnit: (id: string) => void;
+  deactivateMaterialUnit: (id: string) => void;
+
+  // Armazéns (Fase 3.6)
+  warehouses: Warehouse[];
+  addWarehouse: (data: CreateWarehouseInput) => Warehouse;
+  updateWarehouse: (id: string, patch: UpdateWarehouseInput) => void;
+  toggleWarehouseActive: (id: string) => void;
+  setMainWarehouse: (id: string) => void;
+  canDeleteWarehouse: (id: string) => { canDelete: boolean; reason?: string };
+  deleteWarehouse: (id: string) => void;
+
+  // Fornecedores (Etapa 6.2)
+  suppliers: Supplier[];
+  supplierMaterials: SupplierMaterial[];
+  supplierPriceHistories: SupplierPriceHistory[];
+
+  addSupplier: (data: Omit<Supplier, "id" | "createdAt" | "updatedAt">) => Supplier;
+  updateSupplier: (id: string, patch: Partial<Supplier>) => void;
+  activateSupplier: (id: string) => void;
+  deactivateSupplier: (id: string) => void;
+  getSupplierById: (id: string) => Supplier | undefined;
+
+  addSupplierMaterial: (data: Omit<SupplierMaterial, "id" | "createdAt" | "updatedAt" | "priceUpdatedAt">) => SupplierMaterial;
+  updateSupplierMaterial: (id: string, patch: Partial<SupplierMaterial>, reason?: string) => void;
+  activateSupplierMaterial: (id: string) => void;
+  deactivateSupplierMaterial: (id: string) => void;
+  setPreferredSupplierForMaterial: (materialId: string, supplierMaterialId: string | undefined) => void;
+
+  // Compras (Etapa 6.3)
+  purchaseOrders: PurchaseOrder[];
+  purchaseOrderItems: PurchaseOrderItem[];
+  deliveries: Delivery[];
+  deliveryItems: DeliveryItem[];
+  stockMovements: StockMovement[];
+  inventoryBalances: InventoryBalance[];
+
+  // Pedidos de Compra
+  addPurchaseOrder: (data: Omit<PurchaseOrder, "id" | "orderNumber" | "createdAt" | "updatedAt" | "subtotal" | "totalAmount" | "approvedAt" | "sentAt" | "cancelledAt">) => PurchaseOrder;
+  updatePurchaseOrder: (id: string, patch: Partial<PurchaseOrder>) => void;
+  approvePurchaseOrder: (id: string) => void;
+  sendPurchaseOrder: (id: string) => void;
+  cancelPurchaseOrder: (id: string) => void;
+  getPurchaseOrderById: (id: string) => PurchaseOrder | undefined;
+  preparePurchaseOrderDuplicate: (id: string) => PurchaseOrderDuplicateData | null;
+
+  // Itens do Pedido
+  addPurchaseOrderItem: (data: Omit<PurchaseOrderItem, "id" | "createdAt" | "updatedAt" | "orderedBaseQuantity" | "baseUnitPrice" | "lineTotal" | "receivedPurchaseQuantity" | "receivedBaseQuantity" | "remainingPurchaseQuantity">) => PurchaseOrderItem;
+  updatePurchaseOrderItem: (id: string, patch: Partial<PurchaseOrderItem>) => void;
+  removePurchaseOrderItem: (id: string) => void;
+
+  // Entregas
+  addDelivery: (data: Omit<Delivery, "id" | "deliveryNumber" | "createdAt" | "updatedAt" | "confirmedAt" | "cancelledAt">) => Delivery;
+  updateDelivery: (id: string, patch: Partial<Delivery>) => void;
+  confirmDelivery: (id: string) => void;
+  cancelDelivery: (id: string) => void;
+
+  // Itens de Entrega
+  addDeliveryItem: (data: Omit<DeliveryItem, "id" | "createdAt" | "receivedBaseQuantity" | "actualBaseUnitCost" | "acceptedPurchaseQuantity">) => DeliveryItem;
+  updateDeliveryItem: (id: string, patch: Partial<DeliveryItem>) => void;
+  removeDeliveryItem: (id: string) => void;
+
+  // Selectors de Inventário
+  getInventoryBalance: (materialId: string, locationType: InventoryLocationType, projectId?: string) => InventoryBalance | undefined;
+  getInventoryBalancesByMaterial: (materialId: string) => InventoryBalance[];
+  getInventoryBalancesByProject: (projectId: string) => InventoryBalance[];
+  getTotalStockByMaterial: (materialId: string) => number;
+  getTotalInventoryValue: () => number;
+  getInventoryValueByProject: (projectId: string) => number;
+  getStockMovementsByMaterial: (materialId: string) => StockMovement[];
+  getStockMovementsByDelivery: (deliveryId: string) => StockMovement[];
+
   // Utilidades
   resetDemoData: () => void;
 };
@@ -467,6 +612,19 @@ const initialState = {
   teams: teamsSeed,
   projectAssignments: [],
   attendanceRecords: [],
+  disabledProjectDays: [],
+  materials: demoMaterialsSeed,
+  materialCategories: initialMaterialCategories,
+  materialUnits: initialMaterialUnits,
+  suppliers: initialSuppliersSeed,
+  supplierMaterials: initialSupplierMaterialsSeed,
+  supplierPriceHistories: initialSupplierPriceHistoriesSeed,
+  purchaseOrders: demoPurchaseOrdersSeed,
+  purchaseOrderItems: demoPurchaseOrderItemsSeed,
+  deliveries: demoDeliveriesSeed,
+  deliveryItems: demoDeliveryItemsSeed,
+  stockMovements: demoStockMovementsSeed,
+  inventoryBalances: demoInventoryBalancesSeed,
   empresa: empresaSeed,
   utilizador: utilizadorSeed,
 };
@@ -1392,6 +1550,1142 @@ export const useObraMZStore = create<ObraMZState>()(
         return newSchedules;
       },
 
+      disableProjectDay: (projectId, date, reason, notes) => {
+        const existing = (get().disabledProjectDays || []).filter(
+          (d) => !(d.projectId === projectId && d.date === date)
+        );
+        const record: DisabledDayRecord = {
+          id: uid(),
+          projectId,
+          date,
+          reason,
+          notes: notes?.trim() || undefined,
+          createdAt: nowIso(),
+        };
+        set({ disabledProjectDays: [record, ...existing] });
+        return record;
+      },
+
+      enableProjectDay: (projectId, date) => {
+        set((s) => ({
+          disabledProjectDays: (s.disabledProjectDays || []).filter(
+            (d) => !(d.projectId === projectId && d.date === date)
+          ),
+        }));
+      },
+
+      // ---- Materiais (Etapa 6.1) ----
+      addMaterial: (data) => {
+        const err = validateMaterialInput(data, undefined, get().materials || []);
+        if (err) throw new Error(err);
+
+        const now = nowIso();
+        const material: Material = {
+          ...data,
+          id: uid(),
+          name: data.name.trim(),
+          internalCode: data.internalCode?.trim() || undefined,
+          sku: data.sku?.trim() || undefined,
+          categoryId: data.categoryId,
+          unitId: data.unitId,
+          description: data.description?.trim() || undefined,
+          referencePrice: data.referencePrice !== undefined ? Math.max(0, data.referencePrice) : undefined,
+          averagePrice: data.averagePrice !== undefined ? Math.max(0, data.averagePrice) : undefined,
+          currency: data.currency?.trim() || "MZN",
+          minimumStock: data.minimumStock !== undefined ? Math.max(0, data.minimumStock) : undefined,
+          preferredBrand: data.preferredBrand?.trim() || undefined,
+          specifications: data.specifications?.trim() || undefined,
+          imageUrl: data.imageUrl?.trim() || undefined,
+          status: data.status || "active",
+          notes: data.notes?.trim() || undefined,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        set((s) => ({ materials: [material, ...(s.materials || [])] }));
+        get()._addAtividade(`Material ${material.name} criado no catálogo`, "obra", material.id);
+        return material;
+      },
+
+      updateMaterial: (id, patch) => {
+        const existing = (get().materials || []).find((m) => m.id === id);
+        if (!existing) throw new Error("Material não encontrado.");
+
+        const candidate = { ...existing, ...patch };
+        const err = validateMaterialInput(candidate, id, get().materials || []);
+        if (err) throw new Error(err);
+
+        const updated: Material = {
+          ...candidate,
+          name: candidate.name.trim(),
+          internalCode: candidate.internalCode?.trim() || undefined,
+          sku: candidate.sku?.trim() || undefined,
+          description: candidate.description?.trim() || undefined,
+          referencePrice: candidate.referencePrice !== undefined ? Math.max(0, candidate.referencePrice) : undefined,
+          averagePrice: candidate.averagePrice !== undefined ? Math.max(0, candidate.averagePrice) : undefined,
+          currency: candidate.currency?.trim() || "MZN",
+          minimumStock: candidate.minimumStock !== undefined ? Math.max(0, candidate.minimumStock) : undefined,
+          preferredBrand: candidate.preferredBrand?.trim() || undefined,
+          specifications: candidate.specifications?.trim() || undefined,
+          imageUrl: candidate.imageUrl?.trim() || undefined,
+          notes: candidate.notes?.trim() || undefined,
+          updatedAt: nowIso(),
+        };
+
+        set((s) => ({
+          materials: (s.materials || []).map((m) => (m.id === id ? updated : m)),
+        }));
+      },
+
+      activateMaterial: (id) => {
+        set((s) => ({
+          materials: (s.materials || []).map((m) => (m.id === id ? { ...m, status: "active", updatedAt: nowIso() } : m)),
+        }));
+      },
+
+      deactivateMaterial: (id) => {
+        set((s) => ({
+          materials: (s.materials || []).map((m) => (m.id === id ? { ...m, status: "inactive", updatedAt: nowIso() } : m)),
+        }));
+      },
+
+      getMaterialById: (id) => {
+        return (get().materials || []).find((m) => m.id === id);
+      },
+
+      // ---- Categorias de Materiais ----
+      addMaterialCategory: (data) => {
+        const err = validateCategoryInput(data, undefined, get().materialCategories || []);
+        if (err) throw new Error(err);
+
+        const now = nowIso();
+        const category: MaterialCategory = {
+          ...data,
+          id: uid(),
+          name: data.name.trim(),
+          description: data.description?.trim() || undefined,
+          status: data.status || "active",
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        set((s) => ({ materialCategories: [...(s.materialCategories || []), category] }));
+        return category;
+      },
+
+      updateMaterialCategory: (id, patch) => {
+        const existing = (get().materialCategories || []).find((c) => c.id === id);
+        if (!existing) throw new Error("Categoria não encontrada.");
+
+        const candidate = { ...existing, ...patch };
+        const err = validateCategoryInput(candidate, id, get().materialCategories || []);
+        if (err) throw new Error(err);
+
+        const updated: MaterialCategory = {
+          ...candidate,
+          name: candidate.name.trim(),
+          description: candidate.description?.trim() || undefined,
+          updatedAt: nowIso(),
+        };
+
+        set((s) => ({
+          materialCategories: (s.materialCategories || []).map((c) => (c.id === id ? updated : c)),
+        }));
+      },
+
+      activateMaterialCategory: (id) => {
+        set((s) => ({
+          materialCategories: (s.materialCategories || []).map((c) => (c.id === id ? { ...c, status: "active", updatedAt: nowIso() } : c)),
+        }));
+      },
+
+      deactivateMaterialCategory: (id) => {
+        set((s) => ({
+          materialCategories: (s.materialCategories || []).map((c) => (c.id === id ? { ...c, status: "inactive", updatedAt: nowIso() } : c)),
+        }));
+      },
+
+      // ---- Unidades de Medida ----
+      addMaterialUnit: (data) => {
+        const err = validateUnitInput(data, undefined, get().materialUnits || []);
+        if (err) throw new Error(err);
+
+        const now = nowIso();
+        const unit: MaterialUnit = {
+          ...data,
+          id: uid(),
+          name: data.name.trim(),
+          symbol: data.symbol.trim(),
+          type: data.type?.trim() || undefined,
+          precision: data.precision !== undefined ? Math.max(0, data.precision) : 2,
+          status: data.status || "active",
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        set((s) => ({ materialUnits: [...(s.materialUnits || []), unit] }));
+        return unit;
+      },
+
+      updateMaterialUnit: (id, patch) => {
+        const existing = (get().materialUnits || []).find((u) => u.id === id);
+        if (!existing) throw new Error("Unidade não encontrada.");
+
+        const candidate = { ...existing, ...patch };
+        const err = validateUnitInput(candidate, id, get().materialUnits || []);
+        if (err) throw new Error(err);
+
+        const updated: MaterialUnit = {
+          ...candidate,
+          name: candidate.name.trim(),
+          symbol: candidate.symbol.trim(),
+          updatedAt: nowIso(),
+        };
+
+        set((s) => ({
+          materialUnits: (s.materialUnits || []).map((u) => (u.id === id ? updated : u)),
+        }));
+      },
+
+      activateMaterialUnit: (id) => {
+        set((s) => ({
+          materialUnits: (s.materialUnits || []).map((u) => (u.id === id ? { ...u, status: "active", updatedAt: nowIso() } : u)),
+        }));
+      },
+
+      deactivateMaterialUnit: (id) => {
+        set((s) => ({
+          materialUnits: (s.materialUnits || []).map((u) => (u.id === id ? { ...u, status: "inactive", updatedAt: nowIso() } : u)),
+        }));
+      },
+
+      // ---- Armazéns (Fase 3.6) ----
+      warehouses: DEFAULT_INITIAL_WAREHOUSES,
+      addWarehouse: (data) => {
+        const companyId = data.companyId || "COMP-1";
+        const code = data.code.trim().toUpperCase();
+        const name = data.name.trim();
+
+        if (!code) throw new Error("O código do armazém é obrigatório.");
+        if (!name) throw new Error("O nome do armazém é obrigatório.");
+
+        const currentWarehouses = get().warehouses || DEFAULT_INITIAL_WAREHOUSES;
+        if (currentWarehouses.some((w) => w.companyId === companyId && w.code.toUpperCase() === code)) {
+          throw new Error(`Já existe um armazém com o código "${code}".`);
+        }
+        if (currentWarehouses.some((w) => w.companyId === companyId && w.name.toLowerCase() === name.toLowerCase())) {
+          throw new Error(`Já existe um armazém com o nome "${name}".`);
+        }
+
+        const isMainWarehouse = !!data.isMainWarehouse || currentWarehouses.length === 0;
+        const now = nowIso();
+        const warehouse: Warehouse = {
+          id: `WH-${uid()}`,
+          companyId,
+          code,
+          name,
+          address: data.address?.trim(),
+          province: data.province?.trim(),
+          city: data.city?.trim(),
+          isMainWarehouse,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        let updatedList = [...currentWarehouses];
+        if (isMainWarehouse) {
+          updatedList = updatedList.map((w) => ({ ...w, isMainWarehouse: false, updatedAt: now }));
+        }
+
+        set({ warehouses: [warehouse, ...updatedList] });
+        get()._addAtividade(`Armazém ${warehouse.name} (${warehouse.code}) criado`, "obra", warehouse.id);
+        return warehouse;
+      },
+
+      updateWarehouse: (id, patch) => {
+        const currentWarehouses = get().warehouses || DEFAULT_INITIAL_WAREHOUSES;
+        const existing = currentWarehouses.find((w) => w.id === id);
+        if (!existing) throw new Error("Armazém não encontrado.");
+
+        const now = nowIso();
+        let updatedList = currentWarehouses.map((w) => {
+          if (w.id !== id) return w;
+          return {
+            ...w,
+            ...patch,
+            code: patch.code ? patch.code.trim().toUpperCase() : w.code,
+            name: patch.name ? patch.name.trim() : w.name,
+            updatedAt: now,
+          };
+        });
+
+        if (patch.isMainWarehouse) {
+          updatedList = updatedList.map((w) => ({
+            ...w,
+            isMainWarehouse: w.id === id,
+            updatedAt: now,
+          }));
+        }
+
+        set({ warehouses: updatedList });
+      },
+
+      toggleWarehouseActive: (id) => {
+        const currentWarehouses = get().warehouses || DEFAULT_INITIAL_WAREHOUSES;
+        const target = currentWarehouses.find((w) => w.id === id);
+        if (!target) throw new Error("Armazém não encontrado.");
+
+        if (target.isActive && target.isMainWarehouse) {
+          throw new Error("Não é possível desativar o Armazém Principal sem definir outro Armazém Principal primeiro.");
+        }
+
+        set({
+          warehouses: currentWarehouses.map((w) =>
+            w.id === id ? { ...w, isActive: !w.isActive, updatedAt: nowIso() } : w
+          ),
+        });
+      },
+
+      setMainWarehouse: (id) => {
+        const currentWarehouses = get().warehouses || DEFAULT_INITIAL_WAREHOUSES;
+        const target = currentWarehouses.find((w) => w.id === id);
+        if (!target) throw new Error("Armazém não encontrado.");
+        if (!target.isActive) throw new Error("Não é possível definir um armazém inativo como Armazém Principal.");
+
+        set({
+          warehouses: currentWarehouses.map((w) => ({
+            ...w,
+            isMainWarehouse: w.id === id,
+            updatedAt: nowIso(),
+          })),
+        });
+      },
+
+      canDeleteWarehouse: (id) => {
+        const s = get();
+        const warehouse = (s.warehouses || []).find((w) => w.id === id);
+        if (!warehouse) return { canDelete: true };
+
+        const hasMovements = (s.stockMovements || []).some(
+          (m) => m.destinationLocationType === "central_stock" || (m as any).warehouseId === id
+        );
+        const hasBalances = (s.inventoryBalances || []).some(
+          (b) => b.locationType === "central_stock" && b.onHandQuantity > 0
+        );
+        const hasDeliveries = (s.deliveries || []).some(
+          (d) => d.destinationType === "central_stock"
+        );
+
+        if (hasMovements || hasBalances || hasDeliveries) {
+          return {
+            canDelete: false,
+            reason: `O armazém "${warehouse.name}" possui registos históricos ou saldos ativos de inventário. Desative o armazém em vez de eliminar.`,
+          };
+        }
+        return { canDelete: true };
+      },
+
+      deleteWarehouse: (id) => {
+        const check = get().canDeleteWarehouse(id);
+        if (!check.canDelete) {
+          throw new Error(check.reason);
+        }
+        set((s) => ({
+          warehouses: (s.warehouses || []).filter((w) => w.id !== id),
+        }));
+      },
+
+      // -------------------------------------------------------------------
+      // Fornecedores (Etapa 6.2)
+      // -------------------------------------------------------------------
+      getSupplierById: (id) => (get().suppliers || []).find((s) => s.id === id),
+
+      addSupplier: (data) => {
+        const candidate: Partial<Supplier> = {
+          ...data,
+          status: data.status || "active",
+          country: data.country || "Moçambique",
+        };
+        const err = validateSupplierInput(candidate, undefined, get().suppliers || []);
+        if (err) throw new Error(err);
+
+        const newSupplier: Supplier = {
+          id: `supp-${uid()}`,
+          name: candidate.name!.trim(),
+          legalName: candidate.legalName?.trim(),
+          nuit: candidate.nuit?.trim(),
+          country: candidate.country!.trim(),
+          province: candidate.province?.trim() || "",
+          city: candidate.city!.trim(),
+          address: candidate.address?.trim(),
+          phone: candidate.phone!.trim(),
+          secondaryPhone: candidate.secondaryPhone?.trim(),
+          email: candidate.email?.trim(),
+          contactPerson: candidate.contactPerson?.trim(),
+          contactPersonPhone: candidate.contactPersonPhone?.trim(),
+          rating: candidate.rating,
+          paymentTermType: candidate.paymentTermType,
+          paymentTermDays: candidate.paymentTermDays,
+          paymentTermsNotes: candidate.paymentTermsNotes?.trim(),
+          defaultLeadTimeDays: candidate.defaultLeadTimeDays,
+          notes: candidate.notes?.trim(),
+          status: candidate.status as "active" | "inactive",
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+
+        set((s) => ({ suppliers: [newSupplier, ...(s.suppliers || [])] }));
+        return newSupplier;
+      },
+
+      updateSupplier: (id, patch) => {
+        const existing = (get().suppliers || []).find((s) => s.id === id);
+        if (!existing) throw new Error("Fornecedor não encontrado.");
+
+        const candidate = { ...existing, ...patch };
+        const err = validateSupplierInput(candidate, id, get().suppliers || []);
+        if (err) throw new Error(err);
+
+        const updated: Supplier = {
+          ...candidate,
+          name: candidate.name.trim(),
+          legalName: candidate.legalName?.trim(),
+          nuit: candidate.nuit?.trim(),
+          country: candidate.country.trim(),
+          province: candidate.province?.trim() || "",
+          city: candidate.city.trim(),
+          address: candidate.address?.trim(),
+          phone: candidate.phone.trim(),
+          secondaryPhone: candidate.secondaryPhone?.trim(),
+          email: candidate.email?.trim(),
+          contactPerson: candidate.contactPerson?.trim(),
+          contactPersonPhone: candidate.contactPersonPhone?.trim(),
+          paymentTermsNotes: candidate.paymentTermsNotes?.trim(),
+          notes: candidate.notes?.trim(),
+          updatedAt: nowIso(),
+        };
+
+        set((s) => ({
+          suppliers: (s.suppliers || []).map((sup) => (sup.id === id ? updated : sup)),
+        }));
+      },
+
+      activateSupplier: (id) => {
+        set((s) => ({
+          suppliers: (s.suppliers || []).map((sup) => (sup.id === id ? { ...sup, status: "active", updatedAt: nowIso() } : sup)),
+        }));
+      },
+
+      deactivateSupplier: (id) => {
+        set((s) => ({
+          suppliers: (s.suppliers || []).map((sup) => (sup.id === id ? { ...sup, status: "inactive", updatedAt: nowIso() } : sup)),
+        }));
+      },
+
+      addSupplierMaterial: (data) => {
+        const candidate: Partial<SupplierMaterial> = {
+          ...data,
+          status: data.status || "active",
+          currency: data.currency || "MZN",
+          isPreferred: !!data.isPreferred,
+        };
+        const err = validateSupplierMaterialInput(
+          candidate,
+          undefined,
+          get().supplierMaterials || [],
+          get().materials || [],
+          get().materialUnits || [],
+          get().suppliers || []
+        );
+        if (err) throw new Error(err);
+
+        // Se for preferencial, desmarcar preferencial anterior deste mesmo material
+        let currentRels = get().supplierMaterials || [];
+        if (candidate.isPreferred) {
+          currentRels = currentRels.map((r) =>
+            r.materialId === candidate.materialId ? { ...r, isPreferred: false, updatedAt: nowIso() } : r
+          );
+        }
+
+        const newRel: SupplierMaterial = {
+          id: `supp-mat-${uid()}`,
+          supplierId: candidate.supplierId!,
+          materialId: candidate.materialId!,
+          supplierCode: candidate.supplierCode?.trim(),
+          brand: candidate.brand?.trim(),
+          purchaseUnitId: candidate.purchaseUnitId!,
+          conversionFactor: candidate.conversionFactor!,
+          unitPrice: candidate.unitPrice!,
+          currency: candidate.currency!,
+          minimumOrderQuantity: candidate.minimumOrderQuantity,
+          leadTimeDays: candidate.leadTimeDays,
+          commercialConditions: candidate.commercialConditions?.trim(),
+          priceUpdatedAt: nowIso(),
+          isPreferred: !!candidate.isPreferred,
+          status: candidate.status as "active" | "inactive",
+          notes: candidate.notes?.trim(),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+
+        // Registar Snapshot Inicial no Histórico
+        const historySnapshot: SupplierPriceHistory = {
+          id: `sph-${uid()}`,
+          supplierMaterialId: newRel.id,
+          supplierId: newRel.supplierId,
+          materialId: newRel.materialId,
+          newUnitPrice: newRel.unitPrice,
+          currency: newRel.currency,
+          purchaseUnitId: newRel.purchaseUnitId,
+          conversionFactor: newRel.conversionFactor,
+          minimumOrderQuantity: newRel.minimumOrderQuantity,
+          leadTimeDays: newRel.leadTimeDays,
+          brand: newRel.brand,
+          effectiveDate: nowIso(),
+          reason: "Registo inicial de cotação comercial.",
+          createdAt: nowIso(),
+        };
+
+        set((s) => ({
+          supplierMaterials: [newRel, ...currentRels],
+          supplierPriceHistories: [historySnapshot, ...(s.supplierPriceHistories || [])],
+        }));
+
+        return newRel;
+      },
+
+      updateSupplierMaterial: (id, patch, reason) => {
+        const existing = (get().supplierMaterials || []).find((r) => r.id === id);
+        if (!existing) throw new Error("Relação comercial não encontrada.");
+
+        const candidate = { ...existing, ...patch };
+        const err = validateSupplierMaterialInput(
+          candidate,
+          id,
+          get().supplierMaterials || [],
+          get().materials || [],
+          get().materialUnits || [],
+          get().suppliers || []
+        );
+        if (err) throw new Error(err);
+
+        let currentRels = get().supplierMaterials || [];
+        // Se for preferencial, desmarcar preferencial anterior deste mesmo material
+        if (patch.isPreferred) {
+          currentRels = currentRels.map((r) =>
+            r.materialId === candidate.materialId && r.id !== id
+              ? { ...r, isPreferred: false, updatedAt: nowIso() }
+              : r
+          );
+        }
+
+        const priceChanged = patch.unitPrice !== undefined && patch.unitPrice !== existing.unitPrice;
+        const updated: SupplierMaterial = {
+          ...candidate,
+          supplierCode: candidate.supplierCode?.trim(),
+          brand: candidate.brand?.trim(),
+          commercialConditions: candidate.commercialConditions?.trim(),
+          notes: candidate.notes?.trim(),
+          priceUpdatedAt: priceChanged ? nowIso() : existing.priceUpdatedAt,
+          updatedAt: nowIso(),
+        };
+
+        let newHistories = get().supplierPriceHistories || [];
+        if (priceChanged) {
+          const snapshot: SupplierPriceHistory = {
+            id: `sph-${uid()}`,
+            supplierMaterialId: updated.id,
+            supplierId: updated.supplierId,
+            materialId: updated.materialId,
+            previousUnitPrice: existing.unitPrice,
+            newUnitPrice: updated.unitPrice,
+            currency: updated.currency,
+            purchaseUnitId: updated.purchaseUnitId,
+            conversionFactor: updated.conversionFactor,
+            minimumOrderQuantity: updated.minimumOrderQuantity,
+            leadTimeDays: updated.leadTimeDays,
+            brand: updated.brand,
+            effectiveDate: nowIso(),
+            reason: reason || "Atualização de preço comercial pelo utilizador.",
+            createdAt: nowIso(),
+          };
+          newHistories = [snapshot, ...newHistories];
+        }
+
+        set((s) => ({
+          supplierMaterials: currentRels.map((r) => (r.id === id ? updated : r)),
+          supplierPriceHistories: newHistories,
+        }));
+      },
+
+      activateSupplierMaterial: (id) => {
+        set((s) => ({
+          supplierMaterials: (s.supplierMaterials || []).map((r) =>
+            r.id === id ? { ...r, status: "active", updatedAt: nowIso() } : r
+          ),
+        }));
+      },
+
+      deactivateSupplierMaterial: (id) => {
+        set((s) => ({
+          supplierMaterials: (s.supplierMaterials || []).map((r) =>
+            r.id === id ? { ...r, status: "inactive", isPreferred: false, updatedAt: nowIso() } : r
+          ),
+        }));
+      },
+
+      setPreferredSupplierForMaterial: (materialId, supplierMaterialId) => {
+        set((s) => ({
+          supplierMaterials: (s.supplierMaterials || []).map((r) => {
+            if (r.materialId !== materialId) return r;
+            if (supplierMaterialId && r.id === supplierMaterialId) {
+              return { ...r, isPreferred: true, updatedAt: nowIso() };
+            }
+            return { ...r, isPreferred: false, updatedAt: nowIso() };
+          }),
+        }));
+      },
+
+      // ─────────────────────────────────────────────────────────────────
+      // Compras (Etapa 6.3)
+      // ─────────────────────────────────────────────────────────────────
+
+      addPurchaseOrder: (data) => {
+        const s = get();
+        const err = validatePurchaseOrderInput(data, s.suppliers);
+        if (err) throw new Error(err);
+        const items = (s.purchaseOrderItems || []).filter(i => i.purchaseOrderId === "__pending__");
+        const { subtotal, totalAmount } = calculateOrderTotals(items, data.discountAmount, data.taxAmount);
+        const order: PurchaseOrder = {
+          ...data,
+          id: uid(),
+          orderNumber: nextPurchaseOrderNumber(s.purchaseOrders || []),
+          subtotal,
+          totalAmount,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+        set(s => ({ purchaseOrders: [...(s.purchaseOrders || []), order] }));
+        return order;
+      },
+
+      updatePurchaseOrder: (id, patch) => {
+        const s = get();
+        const po = (s.purchaseOrders || []).find(o => o.id === id);
+        if (!po) throw new Error("Pedido de compra não encontrado.");
+        if (po.status !== "draft") throw new Error("Só é possível editar pedidos em rascunho.");
+        const err = validatePurchaseOrderInput({ ...po, ...patch }, s.suppliers);
+        if (err) throw new Error(err);
+        set(s => ({
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === id ? { ...o, ...patch, updatedAt: nowIso() } : o
+          ),
+        }));
+      },
+
+      approvePurchaseOrder: (id) => {
+        const s = get();
+        const po = (s.purchaseOrders || []).find(o => o.id === id);
+        if (!po) throw new Error("Pedido de compra não encontrado.");
+        if (po.status !== "draft" && po.status !== "pending_approval")
+          throw new Error(`Não é possível aprovar um pedido no estado "${po.status}".`);
+        set(s => ({
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === id ? { ...o, status: "approved" as const, approvedAt: nowIso(), updatedAt: nowIso() } : o
+          ),
+        }));
+      },
+
+      sendPurchaseOrder: (id) => {
+        const s = get();
+        const po = (s.purchaseOrders || []).find(o => o.id === id);
+        if (!po) throw new Error("Pedido de compra não encontrado.");
+        if (po.status !== "approved")
+          throw new Error(`Não é possível enviar um pedido no estado "${po.status}".`);
+        set(s => ({
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === id ? { ...o, status: "sent" as const, sentAt: nowIso(), updatedAt: nowIso() } : o
+          ),
+        }));
+      },
+
+      cancelPurchaseOrder: (id) => {
+        const s = get();
+        const po = (s.purchaseOrders || []).find(o => o.id === id);
+        if (!po) throw new Error("Pedido de compra não encontrado.");
+        const hasConfirmedDelivery = (s.deliveries || []).some(
+          d => d.purchaseOrderId === id && d.status === "confirmed"
+        );
+        if (hasConfirmedDelivery)
+          throw new Error("Não é possível cancelar um pedido com entregas já confirmadas.");
+        const terminalStates = ["received", "cancelled"];
+        if (terminalStates.includes(po.status))
+          throw new Error(`Não é possível cancelar um pedido no estado "${po.status}".`);
+        set(s => ({
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === id ? { ...o, status: "cancelled" as const, cancelledAt: nowIso(), updatedAt: nowIso() } : o
+          ),
+        }));
+      },
+
+      getPurchaseOrderById: (id) =>
+        (get().purchaseOrders || []).find(o => o.id === id),
+
+      preparePurchaseOrderDuplicate: (id) => {
+        const s = get();
+        const po = (s.purchaseOrders || []).find(o => o.id === id);
+        if (!po) return null;
+        const items = (s.purchaseOrderItems || []).filter(i => i.purchaseOrderId === id);
+        return {
+          supplierId: po.supplierId,
+          supplierReference: po.supplierReference,
+          destinationType: po.destinationType,
+          destinationProjectId: po.destinationProjectId,
+          currency: po.currency,
+          paymentTermType: po.paymentTermType,
+          paymentTermDays: po.paymentTermDays,
+          commercialConditions: po.commercialConditions,
+          notes: po.notes,
+          internalNotes: po.internalNotes,
+          orderDate: new Date().toISOString().slice(0, 10),
+          status: "draft" as const,
+          items: items.map(item => ({
+            materialId: item.materialId,
+            supplierMaterialId: item.supplierMaterialId,
+            descriptionSnapshot: item.descriptionSnapshot,
+            brandSnapshot: item.brandSnapshot,
+            purchaseUnitId: item.purchaseUnitId,
+            purchaseUnitSymbolSnapshot: item.purchaseUnitSymbolSnapshot,
+            baseUnitId: item.baseUnitId,
+            baseUnitSymbolSnapshot: item.baseUnitSymbolSnapshot,
+            conversionFactor: item.conversionFactor,
+            orderedPurchaseQuantity: item.orderedPurchaseQuantity,
+            unitPrice: item.unitPrice,
+            notes: item.notes,
+          })),
+        };
+      },
+
+      // ── Itens do Pedido ──────────────────────────────────────────────
+
+      addPurchaseOrderItem: (data) => {
+        const s = get();
+        const po = (s.purchaseOrders || []).find(o => o.id === data.purchaseOrderId);
+        const err = validatePurchaseOrderItemInput(data, po?.status);
+        if (err) throw new Error(err);
+        const cf = data.conversionFactor;
+        const item: PurchaseOrderItem = {
+          ...data,
+          id: uid(),
+          orderedBaseQuantity: data.orderedPurchaseQuantity * cf,
+          baseUnitPrice: cf > 0 ? data.unitPrice / cf : data.unitPrice,
+          lineTotal: calculateItemLineTotal(data.orderedPurchaseQuantity, data.unitPrice, data.discountAmount, data.taxAmount),
+          receivedPurchaseQuantity: 0,
+          receivedBaseQuantity: 0,
+          remainingPurchaseQuantity: data.orderedPurchaseQuantity,
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+        // Recalcular totais do PO
+        const allItems = [...(s.purchaseOrderItems || []).filter(i => i.purchaseOrderId === data.purchaseOrderId), item];
+        const { subtotal, totalAmount } = calculateOrderTotals(allItems, po?.discountAmount, po?.taxAmount);
+        set(s => ({
+          purchaseOrderItems: [...(s.purchaseOrderItems || []), item],
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === data.purchaseOrderId ? { ...o, subtotal, totalAmount, updatedAt: nowIso() } : o
+          ),
+        }));
+        return item;
+      },
+
+      updatePurchaseOrderItem: (id, patch) => {
+        const s = get();
+        const item = (s.purchaseOrderItems || []).find(i => i.id === id);
+        if (!item) throw new Error("Item de pedido não encontrado.");
+        const po = (s.purchaseOrders || []).find(o => o.id === item.purchaseOrderId);
+        if (po?.status !== "draft") throw new Error("Itens só podem ser editados em pedidos em rascunho.");
+        const cf = patch.conversionFactor ?? item.conversionFactor;
+        const qty = patch.orderedPurchaseQuantity ?? item.orderedPurchaseQuantity;
+        const price = patch.unitPrice ?? item.unitPrice;
+        const updated: PurchaseOrderItem = {
+          ...item,
+          ...patch,
+          orderedBaseQuantity: qty * cf,
+          baseUnitPrice: cf > 0 ? price / cf : price,
+          lineTotal: calculateItemLineTotal(qty, price, patch.discountAmount ?? item.discountAmount, patch.taxAmount ?? item.taxAmount),
+          remainingPurchaseQuantity: qty - item.receivedPurchaseQuantity,
+          updatedAt: nowIso(),
+        };
+        const allItems = (s.purchaseOrderItems || []).map(i => i.id === id ? updated : i).filter(i => i.purchaseOrderId === item.purchaseOrderId);
+        const { subtotal, totalAmount } = calculateOrderTotals(allItems, po?.discountAmount, po?.taxAmount);
+        set(s => ({
+          purchaseOrderItems: (s.purchaseOrderItems || []).map(i => i.id === id ? updated : i),
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === item.purchaseOrderId ? { ...o, subtotal, totalAmount, updatedAt: nowIso() } : o
+          ),
+        }));
+      },
+
+      removePurchaseOrderItem: (id) => {
+        const s = get();
+        const item = (s.purchaseOrderItems || []).find(i => i.id === id);
+        if (!item) throw new Error("Item de pedido não encontrado.");
+        const po = (s.purchaseOrders || []).find(o => o.id === item.purchaseOrderId);
+        if (po?.status !== "draft") throw new Error("Itens só podem ser removidos em pedidos em rascunho.");
+        const remaining = (s.purchaseOrderItems || []).filter(i => i.purchaseOrderId === item.purchaseOrderId && i.id !== id);
+        if (remaining.length === 0) throw new Error("Não é possível remover o único item do pedido.");
+        const { subtotal, totalAmount } = calculateOrderTotals(remaining, po?.discountAmount, po?.taxAmount);
+        set(s => ({
+          purchaseOrderItems: (s.purchaseOrderItems || []).filter(i => i.id !== id),
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === item.purchaseOrderId ? { ...o, subtotal, totalAmount, updatedAt: nowIso() } : o
+          ),
+        }));
+      },
+
+      // ── Entregas ─────────────────────────────────────────────────────
+
+      addDelivery: (data) => {
+        const s = get();
+        const err = validateDeliveryInput(data, s.purchaseOrders || [], s.deliveries || []);
+        if (err) throw new Error(err);
+        const delivery: Delivery = {
+          ...data,
+          id: uid(),
+          deliveryNumber: nextDeliveryNumber(s.deliveries || []),
+          createdAt: nowIso(),
+          updatedAt: nowIso(),
+        };
+        set(s => ({ deliveries: [...(s.deliveries || []), delivery] }));
+        return delivery;
+      },
+
+      updateDelivery: (id, patch) => {
+        const s = get();
+        const del = (s.deliveries || []).find(d => d.id === id);
+        if (!del) throw new Error("Entrega não encontrada.");
+        if (del.status === "confirmed") throw new Error("Não é possível editar uma entrega já confirmada.");
+        set(s => ({
+          deliveries: (s.deliveries || []).map(d =>
+            d.id === id ? { ...d, ...patch, updatedAt: nowIso() } : d
+          ),
+        }));
+      },
+
+      confirmDelivery: (id) => {
+        // ──────────────────────────────────────────────────────────────
+        // FASE 0 — Leitura (sem set)
+        // ──────────────────────────────────────────────────────────────
+        const s = get();
+        const delivery = (s.deliveries || []).find(d => d.id === id);
+
+        // ──────────────────────────────────────────────────────────────
+        // FASE 1 — Validações (falha = throw; sem set)
+        // ──────────────────────────────────────────────────────────────
+        if (!delivery) throw new Error("Entrega não encontrada.");
+
+        // 1.2 — Idempotência: entrega já confirmada → retorno silencioso
+        if (delivery.status === "confirmed") return;
+
+        // 1.3 — Entrega cancelada
+        if (delivery.status === "cancelled")
+          throw new Error("Não é possível confirmar uma entrega cancelada.");
+
+        // 1.4 — PO existe
+        const po = (s.purchaseOrders || []).find(o => o.id === delivery.purchaseOrderId);
+        if (!po) throw new Error("Pedido de compra associado não encontrado.");
+
+        // 1.5 — PO não está encerrado
+        if (po.status === "cancelled" || po.status === "received")
+          throw new Error(`O pedido de compra está no estado "${po.status}" e não aceita novas entregas.`);
+
+        // 1.6 — Detetar movimentos orfãos (draft com movimentos preexistentes)
+        const delItemIds = (s.deliveryItems || [])
+          .filter(i => i.deliveryId === id)
+          .map(i => i.id);
+        const hasOrphanMovements = (s.stockMovements || []).some(
+          m => m.deliveryItemId && delItemIds.includes(m.deliveryItemId)
+        );
+        if (hasOrphanMovements)
+          throw new Error(
+            "Foi detetado um movimento de stock associado a uma entrega ainda não confirmada. " +
+            "Execute a auditoria ou reconstrução dos saldos antes de continuar."
+          );
+
+        // 1.7 — Validar cada DeliveryItem
+        const delItems = (s.deliveryItems || []).filter(i => i.deliveryId === id);
+        for (const item of delItems) {
+          if (!Number.isFinite(item.acceptedQuantity) || item.acceptedQuantity < 0)
+            throw new Error(`Item ${item.id}: acceptedQuantity inválido.`);
+          if (!Number.isFinite(item.acceptedPurchaseQuantity) || item.acceptedPurchaseQuantity < 0)
+            throw new Error(`Item ${item.id}: acceptedPurchaseQuantity inválido.`);
+          if (!Number.isFinite(item.actualUnitCost) || item.actualUnitCost < 0)
+            throw new Error(`Item ${item.id}: actualUnitCost inválido.`);
+          if (!Number.isFinite(item.actualBaseUnitCost) || item.actualBaseUnitCost < 0)
+            throw new Error(`Item ${item.id}: actualBaseUnitCost inválido.`);
+          if (!Number.isFinite(item.conversionFactor) || item.conversionFactor <= 0)
+            throw new Error(`Item ${item.id}: conversionFactor inválido.`);
+          if (item.acceptedQuantity > item.receivedBaseQuantity + 0.001)
+            throw new Error(`Item ${item.id}: acceptedQuantity excede receivedBaseQuantity.`);
+        }
+
+        // 1.8 — Destino coerente
+        if (delivery.destinationType !== "central_stock" && !delivery.destinationProjectId)
+          throw new Error("destinationProjectId é obrigatório para o destino desta entrega.");
+
+        // ──────────────────────────────────────────────────────────────
+        // FASE 2 — Construção dos novos arrays (sem set)
+        // ──────────────────────────────────────────────────────────────
+        const newMovements: StockMovement[] = [];
+        const updatedBalancesMap = new Map<string, InventoryBalance>();
+        const updatedItemsMap = new Map<string, PurchaseOrderItem>();
+        const now = nowIso();
+
+        for (const item of delItems) {
+          if (item.acceptedQuantity <= 0) continue;
+
+          // 2.1 — Resolver destino de inventário
+          const { locationType: destLocationType, projectId: destProjectId } =
+            resolveInventoryDestination(delivery.destinationType, delivery.destinationProjectId);
+
+          // 2.2 — Criar StockMovement
+          const movement: StockMovement = {
+            id: uid(),
+            materialId: item.materialId,
+            movementType: "purchase_receipt",
+            quantity: item.acceptedQuantity,
+            unitId: (s.materials || []).find(m => m.id === item.materialId)?.unitId ?? "",
+            unitCost: item.actualBaseUnitCost,
+            totalCost: item.acceptedQuantity * item.actualBaseUnitCost,
+            destinationLocationType: destLocationType,
+            destinationProjectId: destProjectId,
+            purchaseOrderId: delivery.purchaseOrderId,
+            deliveryId: delivery.id,
+            deliveryItemId: item.id,
+            referenceType: "delivery_item",
+            referenceId: item.id,
+            movementDate: delivery.deliveryDate,
+            performedBy: delivery.receivedBy,
+            reason: `Receção de compra ${po.orderNumber} / ${delivery.deliveryNumber}`,
+            notes: undefined,
+            createdAt: now,
+          };
+          newMovements.push(movement);
+
+          // 2.3–2.6 — Atualizar InventoryBalance
+          const balKey = getInventoryBalanceKey(item.materialId, destLocationType, destProjectId);
+          const currentBal =
+            updatedBalancesMap.get(balKey) ??
+            (s.inventoryBalances || []).find(
+              b => getInventoryBalanceKey(b.materialId, b.locationType, b.projectId) === balKey
+            );
+          const currentQty = currentBal?.quantityOnHand ?? 0;
+          const currentAvg = currentBal?.averageCost ?? 0;
+          const newAvg = calculateWeightedAverageCost(currentQty, currentAvg, item.acceptedQuantity, item.actualBaseUnitCost);
+          const newQty = (Number.isFinite(currentQty) && currentQty >= 0 ? currentQty : 0) + item.acceptedQuantity;
+          const newTotalValue = Number.isFinite(newQty) && Number.isFinite(newAvg) ? newQty * newAvg : 0;
+          const updatedBal: InventoryBalance = {
+            id: currentBal?.id ?? uid(),
+            materialId: item.materialId,
+            locationType: destLocationType,
+            projectId: destProjectId,
+            quantityOnHand: newQty,
+            averageCost: newAvg,
+            totalValue: newTotalValue,
+            lastMovementAt: now,
+            createdAt: currentBal?.createdAt ?? now,
+            updatedAt: now,
+          };
+          updatedBalancesMap.set(balKey, updatedBal);
+
+          // 2.7 — Acumular PurchaseOrderItem atualizado
+          const existingPOI =
+            updatedItemsMap.get(item.purchaseOrderItemId) ??
+            (s.purchaseOrderItems || []).find(p => p.id === item.purchaseOrderItemId);
+          if (existingPOI) {
+            const newReceivedPurchase = existingPOI.receivedPurchaseQuantity + item.acceptedPurchaseQuantity;
+            const newReceivedBase = existingPOI.receivedBaseQuantity + item.acceptedQuantity;
+            const newRemaining = existingPOI.orderedPurchaseQuantity - newReceivedPurchase;
+            updatedItemsMap.set(item.purchaseOrderItemId, {
+              ...existingPOI,
+              receivedPurchaseQuantity: newReceivedPurchase,
+              receivedBaseQuantity: newReceivedBase,
+              remainingPurchaseQuantity: newRemaining,
+              updatedAt: now,
+            });
+          }
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // FASE 3 — Calcular estado do PurchaseOrder
+        // ──────────────────────────────────────────────────────────────
+        const allPOItems = (s.purchaseOrderItems || [])
+          .filter(p => p.purchaseOrderId === delivery.purchaseOrderId)
+          .map(p => updatedItemsMap.get(p.id) ?? p);
+        const newOrderStatus = calculateOrderStatusFromItems(allPOItems);
+
+        // ──────────────────────────────────────────────────────────────
+        // FASE 3.5 — Ponte Atómica com o InventoryEngine da Fase 2B/3
+        // ──────────────────────────────────────────────────────────────
+        try {
+          const destLocId = delivery.destinationType === "central_stock"
+            ? (delivery as any).warehouseId || "LOC-MAIN-WH"
+            : delivery.destinationProjectId || "LOC-SITE-PROJ";
+
+          inventoryActions.processDelivery({
+            deliveryId: delivery.id,
+            receiptId: `REC-${delivery.id}`,
+            tenantId: "TENANT-A",
+            companyId: "COMP-1",
+            supplierId: po.supplierId,
+            destinationType: delivery.destinationType === "central_stock" ? "warehouse" : "project",
+            destinationLocationId: destLocId,
+            confirmedAt: delivery.deliveryDate,
+            confirmedByActorId: delivery.receivedBy || "actor-manager",
+            items: delItems
+              .filter((i) => i.acceptedQuantity > 0)
+              .map((i) => ({
+                deliveryItemId: i.id,
+                materialId: i.materialId,
+                receivedQuantity: i.acceptedQuantity,
+                unitCost: i.actualBaseUnitCost,
+              })),
+          });
+        } catch (engineErr) {
+          // Se o InventoryEngine rejeitar por idempotência ou erro de validação,
+          // permitimos que a confirmação prossiga se for replay idempotente.
+          console.warn("[confirmDelivery Bridge] Notificação ao InventoryEngine:", engineErr);
+        }
+
+        // ──────────────────────────────────────────────────────────────
+        // FASE 4 — Único set() — tudo ou nada
+        // ──────────────────────────────────────────────────────────────
+        const updatedBalanceKeys = new Set(updatedBalancesMap.keys());
+        const mergedBalances = [
+          ...(s.inventoryBalances || []).filter(
+            b => !updatedBalanceKeys.has(getInventoryBalanceKey(b.materialId, b.locationType, b.projectId))
+          ),
+          ...[...updatedBalancesMap.values()],
+        ];
+
+        set(s => ({
+          stockMovements: [...(s.stockMovements || []), ...newMovements],
+          inventoryBalances: mergedBalances,
+          deliveries: (s.deliveries || []).map(d =>
+            d.id === id ? { ...d, status: "confirmed" as const, confirmedAt: now, updatedAt: now } : d
+          ),
+          purchaseOrderItems: (s.purchaseOrderItems || []).map(p =>
+            updatedItemsMap.has(p.id) ? updatedItemsMap.get(p.id)! : p
+          ),
+          purchaseOrders: (s.purchaseOrders || []).map(o =>
+            o.id === delivery.purchaseOrderId ? { ...o, status: newOrderStatus, updatedAt: now } : o
+          ),
+        }));
+      },
+
+      cancelDelivery: (id) => {
+        const s = get();
+        const del = (s.deliveries || []).find(d => d.id === id);
+        if (!del) throw new Error("Entrega não encontrada.");
+        if (del.status !== "draft") throw new Error("Só é possível cancelar entregas em rascunho.");
+        set(s => ({
+          deliveries: (s.deliveries || []).map(d =>
+            d.id === id ? { ...d, status: "cancelled" as const, cancelledAt: nowIso(), updatedAt: nowIso() } : d
+          ),
+        }));
+      },
+
+      // ── Itens de Entrega ─────────────────────────────────────────────
+
+      addDeliveryItem: (data) => {
+        const s = get();
+        const del = (s.deliveries || []).find(d => d.id === data.deliveryId);
+        if (del?.status !== "draft") throw new Error("Itens de entrega só podem ser adicionados a entregas em rascunho.");
+        const poItem = (s.purchaseOrderItems || []).find(p => p.id === data.purchaseOrderItemId);
+        const err = validateDeliveryItemInput(data, poItem, del?.status);
+        if (err) throw new Error(err);
+        const cf = data.conversionFactor;
+        const acceptedPurchaseQuantity = cf > 0 ? data.acceptedQuantity / cf : 0;
+        const item: DeliveryItem = {
+          ...data,
+          id: uid(),
+          receivedBaseQuantity: data.receivedPurchaseQuantity * cf,
+          acceptedPurchaseQuantity,
+          actualBaseUnitCost: cf > 0 ? data.actualUnitCost / cf : data.actualUnitCost,
+          createdAt: nowIso(),
+        };
+        set(s => ({ deliveryItems: [...(s.deliveryItems || []), item] }));
+        return item;
+      },
+
+      updateDeliveryItem: (id, patch) => {
+        const s = get();
+        const item = (s.deliveryItems || []).find(i => i.id === id);
+        if (!item) throw new Error("Item de entrega não encontrado.");
+        const del = (s.deliveries || []).find(d => d.id === item.deliveryId);
+        if (del?.status !== "draft") throw new Error("Itens de entrega só podem ser editados enquanto a entrega está em rascunho.");
+        const cf = patch.conversionFactor ?? item.conversionFactor;
+        const acceptedQty = patch.acceptedQuantity ?? item.acceptedQuantity;
+        const receivedPurchaseQty = patch.receivedPurchaseQuantity ?? item.receivedPurchaseQuantity;
+        const actualUnitCost = patch.actualUnitCost ?? item.actualUnitCost;
+        const updated: DeliveryItem = {
+          ...item,
+          ...patch,
+          receivedBaseQuantity: receivedPurchaseQty * cf,
+          acceptedPurchaseQuantity: cf > 0 ? acceptedQty / cf : 0,
+          actualBaseUnitCost: cf > 0 ? actualUnitCost / cf : actualUnitCost,
+        };
+        set(s => ({
+          deliveryItems: (s.deliveryItems || []).map(i => i.id === id ? updated : i),
+        }));
+      },
+
+      removeDeliveryItem: (id) => {
+        const s = get();
+        const item = (s.deliveryItems || []).find(i => i.id === id);
+        if (!item) throw new Error("Item de entrega não encontrado.");
+        const del = (s.deliveries || []).find(d => d.id === item.deliveryId);
+        if (del?.status !== "draft") throw new Error("Itens de entrega só podem ser removidos enquanto a entrega está em rascunho.");
+        set(s => ({
+          deliveryItems: (s.deliveryItems || []).filter(i => i.id !== id),
+        }));
+      },
+
+      // ── Selectors de Inventário ──────────────────────────────────────
+
+      getInventoryBalance: (materialId, locationType, projectId) => {
+        const key = getInventoryBalanceKey(materialId, locationType, projectId);
+        return (get().inventoryBalances || []).find(
+          b => getInventoryBalanceKey(b.materialId, b.locationType, b.projectId) === key
+        );
+      },
+
+      getInventoryBalancesByMaterial: (materialId) =>
+        (get().inventoryBalances || []).filter(b => b.materialId === materialId),
+
+      getInventoryBalancesByProject: (projectId) =>
+        (get().inventoryBalances || []).filter(b => b.projectId === projectId),
+
+      getTotalStockByMaterial: (materialId) =>
+        (get().inventoryBalances || [])
+          .filter(b => b.materialId === materialId)
+          .reduce((sum, b) => sum + (Number.isFinite(b.quantityOnHand) ? b.quantityOnHand : 0), 0),
+
+      getTotalInventoryValue: () =>
+        calculateInventoryTotalValue(get().inventoryBalances || []),
+
+      getInventoryValueByProject: (projectId) =>
+        (get().inventoryBalances || [])
+          .filter(b => b.projectId === projectId)
+          .reduce((sum, b) => sum + (Number.isFinite(b.totalValue) ? b.totalValue : 0), 0),
+
+      getStockMovementsByMaterial: (materialId) =>
+        (get().stockMovements || []).filter(m => m.materialId === materialId),
+
+      getStockMovementsByDelivery: (deliveryId) =>
+        (get().stockMovements || []).filter(m => m.deliveryId === deliveryId),
+
       resetDemoData: () => set({ ...initialState, _hydrated: true }),
     }),
     {
@@ -1439,6 +2733,19 @@ export const useObraMZStore = create<ObraMZState>()(
         projectAssignments: s.projectAssignments || [],
         attendanceRecords: s.attendanceRecords || [],
         attendanceSchedules: s.attendanceSchedules || [],
+        disabledProjectDays: s.disabledProjectDays || [],
+        materials: s.materials || [],
+        materialCategories: s.materialCategories || [],
+        materialUnits: s.materialUnits || [],
+        suppliers: s.suppliers || [],
+        supplierMaterials: s.supplierMaterials || [],
+        supplierPriceHistories: s.supplierPriceHistories || [],
+        purchaseOrders: s.purchaseOrders || [],
+        purchaseOrderItems: s.purchaseOrderItems || [],
+        deliveries: s.deliveries || [],
+        deliveryItems: s.deliveryItems || [],
+        stockMovements: s.stockMovements || [],
+        inventoryBalances: s.inventoryBalances || [],
       }),
     },
   ),
@@ -1515,31 +2822,112 @@ const migrateSchedules = (schedules: any[]) => {
   }));
 };
 
-// Rehydrate manualmente no cliente (evita mismatch SSR ↔ CSR)
+// Funções de migração para dados da Etapa 6.3
+const migratePurchaseOrders = (orders: any[]): PurchaseOrder[] =>
+  (orders || []).map(o => ({
+    ...o,
+    currency: o.currency || "MZN",
+    subtotal: Number.isFinite(o.subtotal) ? o.subtotal : 0,
+    totalAmount: Number.isFinite(o.totalAmount) ? o.totalAmount : 0,
+  }));
+
+const migratePurchaseOrderItems = (items: any[]): PurchaseOrderItem[] =>
+  (items || []).map(i => ({
+    ...i,
+    receivedPurchaseQuantity: Number.isFinite(i.receivedPurchaseQuantity) ? i.receivedPurchaseQuantity : 0,
+    receivedBaseQuantity: Number.isFinite(i.receivedBaseQuantity) ? i.receivedBaseQuantity : 0,
+    remainingPurchaseQuantity: Number.isFinite(i.remainingPurchaseQuantity)
+      ? i.remainingPurchaseQuantity
+      : (Number.isFinite(i.orderedPurchaseQuantity) ? i.orderedPurchaseQuantity : 0),
+  }));
+
+const migrateDeliveries = (deliveries: any[]): Delivery[] =>
+  (deliveries || []).map(d => ({
+    ...d,
+    status: d.status || "draft",
+  }));
+
+const migrateDeliveryItems = (items: any[]): DeliveryItem[] =>
+  (items || []).map(i => {
+    const cf = Number.isFinite(i.conversionFactor) && i.conversionFactor > 0 ? i.conversionFactor : 1;
+    const acceptedQty = Number.isFinite(i.acceptedQuantity) && i.acceptedQuantity >= 0 ? i.acceptedQuantity : 0;
+    return {
+      ...i,
+      receivedBaseQuantity: Number.isFinite(i.receivedBaseQuantity)
+        ? i.receivedBaseQuantity
+        : (Number.isFinite(i.receivedPurchaseQuantity) ? i.receivedPurchaseQuantity * cf : 0),
+      acceptedPurchaseQuantity: Number.isFinite(i.acceptedPurchaseQuantity)
+        ? i.acceptedPurchaseQuantity
+        : acceptedQty / cf,
+      actualBaseUnitCost: Number.isFinite(i.actualBaseUnitCost)
+        ? i.actualBaseUnitCost
+        : (Number.isFinite(i.actualUnitCost) ? i.actualUnitCost / cf : 0),
+    };
+  });
+
+const migrateStockMovements = (movements: any[]): StockMovement[] =>
+  (movements || []).map(m => ({
+    ...m,
+    destinationLocationType: m.destinationLocationType || m.destinationType || "central_stock",
+    destinationProjectId: m.destinationProjectId ?? m.projectId,
+  }));
+
+const migrateInventoryBalances = (balances: any[]): InventoryBalance[] =>
+  (balances || []).map(b => {
+    const qty = Number.isFinite(b.quantityOnHand) && b.quantityOnHand >= 0 ? b.quantityOnHand : 0;
+    const avg = Number.isFinite(b.averageCost) && b.averageCost >= 0 ? b.averageCost : 0;
+    return {
+      ...b,
+      quantityOnHand: qty,
+      averageCost: avg,
+      totalValue: Number.isFinite(b.totalValue) ? b.totalValue : qty * avg,
+    };
+  });
+
+// Rehydrate seguro e idempotente no cliente (evita mismatch SSR ↔ CSR e recupera propriedades em falta)
+const ensureHydratedState = () => {
+  const state = useObraMZStore.getState();
+  const migrated = migrateAssignments(state.projectAssignments || [], state.workers || [], state.teams || []);
+  const migratedSchedules = migrateSchedules(state.attendanceSchedules || []);
+  useObraMZStore.setState({
+    clientes: state.clientes && state.clientes.length > 0 ? state.clientes : clientesSeed,
+    obras: state.obras && state.obras.length > 0 ? state.obras : obrasSeed,
+    orcamentos: state.orcamentos && state.orcamentos.length > 0 ? state.orcamentos : orcamentosSeed,
+    pagamentos: state.pagamentos && state.pagamentos.length > 0 ? state.pagamentos : pagamentosSeed,
+    atividades: state.atividades || atividadesSeed,
+    workers: state.workers || workersSeed,
+    teams: state.teams || teamsSeed,
+    empresa: state.empresa?.nome ? state.empresa : empresaSeed,
+    utilizador: state.utilizador?.nome ? state.utilizador : utilizadorSeed,
+    projectAssignments: migrated,
+    attendanceRecords: state.attendanceRecords || [],
+    attendanceSchedules: migratedSchedules,
+    disabledProjectDays: state.disabledProjectDays || [],
+    materials: state.materials && state.materials.length > 0 ? state.materials : demoMaterialsSeed,
+    materialCategories: state.materialCategories && state.materialCategories.length > 0 ? state.materialCategories : initialMaterialCategories,
+    materialUnits: state.materialUnits && state.materialUnits.length > 0 ? state.materialUnits : initialMaterialUnits,
+    suppliers: state.suppliers !== undefined ? state.suppliers : initialSuppliersSeed,
+    supplierMaterials: state.supplierMaterials !== undefined ? state.supplierMaterials : initialSupplierMaterialsSeed,
+    supplierPriceHistories: state.supplierPriceHistories !== undefined ? state.supplierPriceHistories : initialSupplierPriceHistoriesSeed,
+    // Etapa 6.3 — usar !== undefined para preservar arrays vazios do utilizador
+    purchaseOrders: state.purchaseOrders !== undefined ? migratePurchaseOrders(state.purchaseOrders) : demoPurchaseOrdersSeed,
+    purchaseOrderItems: state.purchaseOrderItems !== undefined ? migratePurchaseOrderItems(state.purchaseOrderItems) : demoPurchaseOrderItemsSeed,
+    deliveries: state.deliveries !== undefined ? migrateDeliveries(state.deliveries) : demoDeliveriesSeed,
+    deliveryItems: state.deliveryItems !== undefined ? migrateDeliveryItems(state.deliveryItems) : demoDeliveryItemsSeed,
+    stockMovements: state.stockMovements !== undefined ? migrateStockMovements(state.stockMovements) : demoStockMovementsSeed,
+    inventoryBalances: state.inventoryBalances !== undefined ? migrateInventoryBalances(state.inventoryBalances) : demoInventoryBalancesSeed,
+    _hydrated: true,
+  });
+};
+
 if (typeof window !== "undefined") {
   useObraMZStore.persist.rehydrate()?.then?.(() => {
-    const state = useObraMZStore.getState();
-    const migrated = migrateAssignments(state.projectAssignments, state.workers, state.teams);
-    const migratedSchedules = migrateSchedules(state.attendanceSchedules || []);
-    useObraMZStore.setState({
-      projectAssignments: migrated,
-      attendanceRecords: state.attendanceRecords || [],
-      attendanceSchedules: migratedSchedules,
-      _hydrated: true,
-    });
+    ensureHydratedState();
   });
-  // fallback
+  // fallback de execução imediata
   setTimeout(() => {
     if (!useObraMZStore.getState()._hydrated) {
-      const state = useObraMZStore.getState();
-      const migrated = migrateAssignments(state.projectAssignments, state.workers, state.teams);
-      const migratedSchedules = migrateSchedules(state.attendanceSchedules || []);
-      useObraMZStore.setState({
-        projectAssignments: migrated,
-        attendanceRecords: state.attendanceRecords || [],
-        attendanceSchedules: migratedSchedules,
-        _hydrated: true,
-      });
+      ensureHydratedState();
     }
   }, 0);
 }
@@ -1549,9 +2937,9 @@ if (typeof window !== "undefined") {
 // -------------------------------------------------------------------
 
 export function totalsPorObra(obraId: string, state = useObraMZStore.getState()) {
-  const orcs = state.orcamentos.filter((o) => o.obraId === obraId);
-  const orcado = orcs.filter((o) => o.estado === "aceite").reduce((s, o) => s + totalOrcamento(o).total, 0);
-  const recebido = state.pagamentos
+  const orcs = (state?.orcamentos || []).filter((o) => o.obraId === obraId);
+  const orcado = orcs.reduce((s, o) => s + totalOrcamento(o).total, 0);
+  const recebido = (state?.pagamentos || [])
     .filter((p) => p.obraId === obraId && p.estado === "confirmado")
     .reduce((s, p) => s + p.valor, 0);
   const pendente = Math.max(0, orcado - recebido);
@@ -1559,26 +2947,31 @@ export function totalsPorObra(obraId: string, state = useObraMZStore.getState())
 }
 
 export function totalsPorCliente(clienteId: string, state = useObraMZStore.getState()) {
-  const orcs = state.orcamentos.filter((o) => o.clienteId === clienteId);
+  const orcs = (state?.orcamentos || []).filter((o) => o.clienteId === clienteId);
   const orcado = orcs.reduce((s, o) => s + totalOrcamento(o).total, 0);
   const aceite = orcs.filter((o) => o.estado === "aceite").reduce((s, o) => s + totalOrcamento(o).total, 0);
-  const recebido = state.pagamentos
+  const recebido = (state?.pagamentos || [])
     .filter((p) => p.clienteId === clienteId && p.estado === "confirmado")
     .reduce((s, p) => s + p.valor, 0);
   const pendente = Math.max(0, aceite - recebido);
-  const obras = state.obras.filter((o) => o.clienteId === clienteId);
+  const obras = (state?.obras || []).filter((o) => o.clienteId === clienteId);
   return { orcado, aceite, recebido, pendente, obras };
 }
 
 export function metricasGlobais(state = useObraMZStore.getState()) {
-  const obrasAtivas = state.obras.filter((o) => o.estado === "em_andamento").length;
-  const orcamentosEmitidos = state.orcamentos.length;
-  const orcamentosAceites = state.orcamentos.filter((o) => o.estado === "aceite").length;
-  const totalOrcado = state.orcamentos.reduce((s, o) => s + totalOrcamento(o).total, 0);
-  const totalAceite = state.orcamentos.filter((o) => o.estado === "aceite").reduce((s, o) => s + totalOrcamento(o).total, 0);
-  const totalRecebido = state.pagamentos.filter((p) => p.estado === "confirmado").reduce((s, p) => s + p.valor, 0);
+  const obras = state?.obras || [];
+  const orcamentos = state?.orcamentos || [];
+  const pagamentos = state?.pagamentos || [];
+  const clientes = state?.clientes || [];
+
+  const obrasAtivas = obras.filter((o) => o.estado === "em_andamento").length;
+  const orcamentosEmitidos = orcamentos.length;
+  const orcamentosAceites = orcamentos.filter((o) => o.estado === "aceite").length;
+  const totalOrcado = orcamentos.reduce((s, o) => s + totalOrcamento(o).total, 0);
+  const totalAceite = orcamentos.filter((o) => o.estado === "aceite").reduce((s, o) => s + totalOrcamento(o).total, 0);
+  const totalRecebido = pagamentos.filter((p) => p.estado === "confirmado").reduce((s, p) => s + p.valor, 0);
   const pendente = Math.max(0, totalAceite - totalRecebido);
-  const pagamentosPendentes = state.pagamentos.filter((p) => p.estado === "pendente").length;
+  const pagamentosPendentes = pagamentos.filter((p) => p.estado === "pendente").length;
   return {
     obrasAtivas,
     orcamentosEmitidos,

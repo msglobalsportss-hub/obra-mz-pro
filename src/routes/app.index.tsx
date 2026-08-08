@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, StatusBadge } from "@/components/page-header";
+import { PageContainer } from "@/components/shared/page-container";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,11 +33,11 @@ const ESTADO_COLORS: Record<string, string> = {
 
 function Dashboard() {
   const hydrated = useHydrated();
-  const clientes = useObraMZStore((s) => s.clientes);
-  const obras = useObraMZStore((s) => s.obras);
-  const orcamentos = useObraMZStore((s) => s.orcamentos);
-  const pagamentos = useObraMZStore((s) => s.pagamentos);
-  const atividades = useObraMZStore((s) => s.atividades);
+  const clientes = useObraMZStore((s) => s.clientes || []);
+  const obras = useObraMZStore((s) => s.obras || []);
+  const orcamentos = useObraMZStore((s) => s.orcamentos || []);
+  const pagamentos = useObraMZStore((s) => s.pagamentos || []);
+  const atividades = useObraMZStore((s) => s.atividades || []);
   const empresa = useObraMZStore((s) => s.empresa);
   const utilizador = useObraMZStore((s) => s.utilizador);
 
@@ -54,9 +55,15 @@ function Dashboard() {
       })()
     : "Olá";
 
-  const obrasAtivas = obras.filter((o) => o.estado === "em_andamento").slice(0, 4);
-  const orcRecentes = [...orcamentos].sort((a, b) => b.emissao.localeCompare(a.emissao)).slice(0, 5);
-  const pagRecentes = [...pagamentos].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 5);
+  const obrasAtivas = (obras || []).filter((o) => o && o.estado === "em_andamento").slice(0, 4);
+  const orcRecentes = [...(orcamentos || [])]
+    .filter((o) => o && o.emissao)
+    .sort((a, b) => (b.emissao || "").localeCompare(a.emissao || ""))
+    .slice(0, 5);
+  const pagRecentes = [...(pagamentos || [])]
+    .filter((p) => p && p.data)
+    .sort((a, b) => (b.data || "").localeCompare(a.data || ""))
+    .slice(0, 5);
 
   // Chart mensal — últimos 7 meses
   const chartMensal = useMemo(() => {
@@ -70,39 +77,43 @@ function Dashboard() {
       });
     }
     return meses.map((m) => {
-      const orc = orcamentos
-        .filter((o) => o.emissao.startsWith(m.key))
+      const orc = (orcamentos || [])
+        .filter((o) => o && typeof o.emissao === "string" && o.emissao.startsWith(m.key))
         .reduce((s, o) => s + totalOrcamento(o).total, 0);
-      const rec = pagamentos
-        .filter((p) => p.data.startsWith(m.key) && p.estado === "confirmado")
-        .reduce((s, p) => s + p.valor, 0);
+      const rec = (pagamentos || [])
+        .filter((p) => p && typeof p.data === "string" && p.data.startsWith(m.key) && p.estado === "confirmado")
+        .reduce((s, p) => s + (p.valor || 0), 0);
       return { mes: m.label, orcado: orc, recebido: rec };
     });
   }, [orcamentos, pagamentos]);
 
   const chartEstados = useMemo(() => {
     const grouped = new Map<string, number>();
-    for (const o of orcamentos) grouped.set(o.estado, (grouped.get(o.estado) ?? 0) + 1);
+    for (const o of (orcamentos || [])) {
+      if (o && o.estado) {
+        grouped.set(o.estado, (grouped.get(o.estado) ?? 0) + 1);
+      }
+    }
     return Array.from(grouped.entries()).map(([estado, valor]) => ({
-      nome: estadoOrcamentoLabel[estado as keyof typeof estadoOrcamentoLabel],
+      nome: estadoOrcamentoLabel[estado as keyof typeof estadoOrcamentoLabel] || estado,
       valor,
       cor: ESTADO_COLORS[estado] || "hsl(var(--muted-foreground))",
     }));
   }, [orcamentos]);
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
         title={
           <span>
-            {saudacao}, <span className="text-primary">{utilizador.nome.split(" ")[0]}</span>
+            {saudacao}, <span className="text-orange-600">{(utilizador?.nome || "Utilizador").split(" ")[0]}</span>
           </span>
         }
-        description={<>{empresa.nome}{hydrated && <> · {formatDate(new Date().toISOString())}</>}</>}
+        description={<>{empresa?.nome || "ObraMZ"}{hydrated && <> · {formatDate(new Date().toISOString())}</>}</>}
         actions={
           <>
-            <Link to="/app/obras"><Button variant="outline"><Plus className="mr-1 h-4 w-4" />Nova obra</Button></Link>
-            <Link to="/app/orcamentos/novo"><Button className="bg-primary hover:bg-primary-dark"><Plus className="mr-1 h-4 w-4" />Novo orçamento</Button></Link>
+            <Link to="/app/obras"><Button variant="outline" className="text-xs h-9"><Plus className="mr-1 h-4 w-4" />Nova obra</Button></Link>
+            <Link to="/app/orcamentos/novo"><Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm text-xs font-semibold h-9"><Plus className="mr-1 h-4 w-4" />Novo orçamento</Button></Link>
           </>
         }
       />
@@ -279,6 +290,6 @@ function Dashboard() {
           )}
         </Card>
       </div>
-    </div>
+    </PageContainer>
   );
 }

@@ -35,12 +35,12 @@ function AppLayout() {
                 <Bell className="h-4 w-4" />
               </button>
               <div className="hidden text-right sm:block">
-                <div className="text-xs font-semibold leading-tight text-foreground">{utilizador.nome}</div>
-                <div className="text-[11px] leading-tight text-muted-foreground">{utilizador.cargo}</div>
+                <div className="text-xs font-semibold leading-tight text-foreground">{utilizador?.nome || "Utilizador"}</div>
+                <div className="text-[11px] leading-tight text-muted-foreground">{utilizador?.cargo || "Gestor"}</div>
               </div>
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                  {initials(utilizador.nome)}
+                  {initials(utilizador?.nome || "Utilizador")}
                 </AvatarFallback>
               </Avatar>
             </div>

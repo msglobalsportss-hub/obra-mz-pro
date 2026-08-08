@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
+import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,6 +30,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import type { AttendanceRecord, AttendanceStatus } from "@/lib/mock-data";
 import { formatAttendanceHours, formatMins } from "@/lib/time-utils";
+import { formatMZN } from "@/lib/format";
+import { calculateDailyLabourSummary } from "@/lib/attendance-labour-cost";
 import { getAttendanceKPIs, getAttendanceSummary, getAttendanceStats } from "@/lib/attendance-analytics";
 import {
   AttendancePeriodMode, getDayRange, getWeekRange, getMonthRange,
@@ -285,6 +288,11 @@ function PresencasPage() {
     return map;
   }, [teams]);
 
+  // Resumo Diário / Periódico de Mão de Obra e Custos (Fase 5.4)
+  const labourSummary = useMemo(() => {
+    return calculateDailyLabourSummary(filteredRecords, workerMap);
+  }, [filteredRecords, workerMap]);
+
   // Formatação monetária abreviada do KPI de Custo
   const formattedKpiCost = useMemo(() => {
     return formatCurrencyAbbreviated(analyticsKPIs.operationalCost.totalCost);
@@ -415,10 +423,11 @@ function PresencasPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <PageContainer>
       <PageHeader
         title="Presenças"
         description="Registe e controle a presença diária e as escalas de trabalho dos trabalhadores alocados a cada obra."
+        breadcrumbs={[{ label: "Presenças" }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -560,6 +569,78 @@ function PresencasPage() {
         hojeButtonLabel={hojeButtonLabel}
         isHojeDisabled={isHojeDisabled}
       />
+
+      {/* PAINEL DE CUSTOS DE MÃO DE OBRA (FASE 5.4) */}
+      <Card className="border border-border/80 bg-card overflow-hidden">
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-emerald-500/10 rounded-lg text-emerald-600">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-foreground">
+                  {periodMode === "day"
+                    ? dateFrom === todayStr
+                      ? "Resumo de Mão de Obra de Hoje"
+                      : `Resumo de Mão de Obra da Data Selecionada (${periodLabel})`
+                    : `Resumo de Mão de Obra do Período (${periodLabel})`}
+                </h3>
+                <p className="text-[10px] text-muted-foreground">
+                  Detalhamento de horas regulares, extraordinárias e custos computados para {periodLabel}.
+                </p>
+              </div>
+            </div>
+            {labourSummary.hasMultipleCurrencies && (
+              <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                Múltiplas Moedas Detectadas
+              </Badge>
+            )}
+          </div>
+
+          {Object.keys(labourSummary.byCurrency).length === 0 ? (
+            <div className="p-4 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
+              Nenhum registo de presença com custo guardado para o período selecionado.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {Object.values(labourSummary.byCurrency).map((sum) => (
+                <div key={sum.currency} className="p-3 rounded-lg border bg-muted/20 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold border-b pb-1">
+                    <span>Totais em {sum.currency}</span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {sum.totalWorkers} Operários
+                    </Badge>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Horas Regulares:</span>
+                      <span className="font-semibold text-foreground">{sum.regularHours}h</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Horas Extra:</span>
+                      <span className="font-semibold text-foreground">{sum.overtimeHours}h</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Horas Totais:</span>
+                      <span className="font-bold text-foreground">{sum.workedHours}h</span>
+                    </div>
+                    <div className="border-t pt-1 flex justify-between font-bold text-emerald-700 dark:text-emerald-400">
+                      <span>Custo Total:</span>
+                      <span>{formatMZN(sum.totalLabourCost)}</span>
+                    </div>
+                  </div>
+                  {sum.workersWithoutSalaryConfig > 0 && (
+                    <div className="text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/10 p-1.5 rounded text-center">
+                      ⚠️ {sum.workersWithoutSalaryConfig} operário(s) sem remuneração configurada
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* PAINEL DE RANKINGS OPERACIONAIS: TOP TRABALHADORES DO PERÍODO (FASE 4.3) */}
       {topWorkers.length > 0 && (
@@ -876,9 +957,9 @@ function PresencasPage() {
         title="Remover Presença"
         description="Tem certeza que deseja apagar este registo de presença? Esta ação não pode ser desfeita."
         confirmLabel="Apagar"
-        variant="danger"
+        tone="destructive"
         onConfirm={() => confirmDel && handleDeleteRecord(confirmDel)}
       />
-    </div>
+    </PageContainer>
   );
 }

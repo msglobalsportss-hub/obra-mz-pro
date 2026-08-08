@@ -21,14 +21,32 @@ import { Route as AppPresencasIndexRouteImport } from './routes/app.presencas.in
 import { Route as AppPagamentosIndexRouteImport } from './routes/app.pagamentos.index'
 import { Route as AppOrcamentosIndexRouteImport } from './routes/app.orcamentos.index'
 import { Route as AppObrasIndexRouteImport } from './routes/app.obras.index'
+import { Route as AppMateriaisIndexRouteImport } from './routes/app.materiais.index'
+import { Route as AppInventoryIndexRouteImport } from './routes/app.inventory.index'
+import { Route as AppFornecedoresIndexRouteImport } from './routes/app.fornecedores.index'
 import { Route as AppEquipasIndexRouteImport } from './routes/app.equipas.index'
 import { Route as AppEmpresaIndexRouteImport } from './routes/app.empresa.index'
 import { Route as AppConfiguracoesIndexRouteImport } from './routes/app.configuracoes.index'
+import { Route as AppComprasIndexRouteImport } from './routes/app.compras.index'
 import { Route as AppClientesIndexRouteImport } from './routes/app.clientes.index'
 import { Route as AppOrcamentosNovoRouteImport } from './routes/app.orcamentos.novo'
 import { Route as AppOrcamentosIdRouteImport } from './routes/app.orcamentos.$id'
 import { Route as AppObrasIdRouteImport } from './routes/app.obras.$id'
+import { Route as AppInventoryTransfersRouteImport } from './routes/app.inventory.transfers'
+import { Route as AppInventoryStockRouteImport } from './routes/app.inventory.stock'
+import { Route as AppInventoryReservationsRouteImport } from './routes/app.inventory.reservations'
+import { Route as AppInventoryReportsRouteImport } from './routes/app.inventory.reports'
+import { Route as AppInventoryRebuildRouteImport } from './routes/app.inventory.rebuild'
+import { Route as AppInventoryMovementsRouteImport } from './routes/app.inventory.movements'
+import { Route as AppInventoryHealthRouteImport } from './routes/app.inventory.health'
+import { Route as AppInventoryDeliveriesRouteImport } from './routes/app.inventory.deliveries'
+import { Route as AppInventoryAdjustmentsRouteImport } from './routes/app.inventory.adjustments'
+import { Route as AppEmpresaArmazensRouteImport } from './routes/app.empresa.armazens'
+import { Route as AppComprasPurchaseOrderIdRouteImport } from './routes/app.compras.$purchaseOrderId'
 import { Route as AppClientesIdRouteImport } from './routes/app.clientes.$id'
+import { Route as AppInventoryMaterialsMaterialIdRouteImport } from './routes/app.inventory.materials.$materialId'
+import { Route as AppInventoryDeliveriesDeliveryIdRouteImport } from './routes/app.inventory.deliveries_.$deliveryId'
+import { Route as AppInventoryDeliveriesDeliveryIdConferenciaRouteImport } from './routes/app.inventory.deliveries_.$deliveryId.conferencia'
 
 const RecuperarPasswordRoute = RecuperarPasswordRouteImport.update({
   id: '/recuperar-password',
@@ -90,6 +108,21 @@ const AppObrasIndexRoute = AppObrasIndexRouteImport.update({
   path: '/obras/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMateriaisIndexRoute = AppMateriaisIndexRouteImport.update({
+  id: '/materiais/',
+  path: '/materiais/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryIndexRoute = AppInventoryIndexRouteImport.update({
+  id: '/inventory/',
+  path: '/inventory/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFornecedoresIndexRoute = AppFornecedoresIndexRouteImport.update({
+  id: '/fornecedores/',
+  path: '/fornecedores/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppEquipasIndexRoute = AppEquipasIndexRouteImport.update({
   id: '/equipas/',
   path: '/equipas/',
@@ -103,6 +136,11 @@ const AppEmpresaIndexRoute = AppEmpresaIndexRouteImport.update({
 const AppConfiguracoesIndexRoute = AppConfiguracoesIndexRouteImport.update({
   id: '/configuracoes/',
   path: '/configuracoes/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppComprasIndexRoute = AppComprasIndexRouteImport.update({
+  id: '/compras/',
+  path: '/compras/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppClientesIndexRoute = AppClientesIndexRouteImport.update({
@@ -125,11 +163,86 @@ const AppObrasIdRoute = AppObrasIdRouteImport.update({
   path: '/obras/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInventoryTransfersRoute = AppInventoryTransfersRouteImport.update({
+  id: '/inventory/transfers',
+  path: '/inventory/transfers',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryStockRoute = AppInventoryStockRouteImport.update({
+  id: '/inventory/stock',
+  path: '/inventory/stock',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryReservationsRoute =
+  AppInventoryReservationsRouteImport.update({
+    id: '/inventory/reservations',
+    path: '/inventory/reservations',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppInventoryReportsRoute = AppInventoryReportsRouteImport.update({
+  id: '/inventory/reports',
+  path: '/inventory/reports',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryRebuildRoute = AppInventoryRebuildRouteImport.update({
+  id: '/inventory/rebuild',
+  path: '/inventory/rebuild',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryMovementsRoute = AppInventoryMovementsRouteImport.update({
+  id: '/inventory/movements',
+  path: '/inventory/movements',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryHealthRoute = AppInventoryHealthRouteImport.update({
+  id: '/inventory/health',
+  path: '/inventory/health',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryDeliveriesRoute = AppInventoryDeliveriesRouteImport.update({
+  id: '/inventory/deliveries',
+  path: '/inventory/deliveries',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInventoryAdjustmentsRoute = AppInventoryAdjustmentsRouteImport.update({
+  id: '/inventory/adjustments',
+  path: '/inventory/adjustments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmpresaArmazensRoute = AppEmpresaArmazensRouteImport.update({
+  id: '/empresa/armazens',
+  path: '/empresa/armazens',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppComprasPurchaseOrderIdRoute =
+  AppComprasPurchaseOrderIdRouteImport.update({
+    id: '/compras/$purchaseOrderId',
+    path: '/compras/$purchaseOrderId',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppClientesIdRoute = AppClientesIdRouteImport.update({
   id: '/clientes/$id',
   path: '/clientes/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInventoryMaterialsMaterialIdRoute =
+  AppInventoryMaterialsMaterialIdRouteImport.update({
+    id: '/inventory/materials/$materialId',
+    path: '/inventory/materials/$materialId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppInventoryDeliveriesDeliveryIdRoute =
+  AppInventoryDeliveriesDeliveryIdRouteImport.update({
+    id: '/inventory/deliveries_/$deliveryId',
+    path: '/inventory/deliveries/$deliveryId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppInventoryDeliveriesDeliveryIdConferenciaRoute =
+  AppInventoryDeliveriesDeliveryIdConferenciaRouteImport.update({
+    id: '/conferencia',
+    path: '/conferencia',
+    getParentRoute: () => AppInventoryDeliveriesDeliveryIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -140,18 +253,36 @@ export interface FileRoutesByFullPath {
   '/recuperar-password': typeof RecuperarPasswordRoute
   '/app/': typeof AppIndexRoute
   '/app/clientes/$id': typeof AppClientesIdRoute
+  '/app/compras/$purchaseOrderId': typeof AppComprasPurchaseOrderIdRoute
+  '/app/empresa/armazens': typeof AppEmpresaArmazensRoute
+  '/app/inventory/adjustments': typeof AppInventoryAdjustmentsRoute
+  '/app/inventory/deliveries': typeof AppInventoryDeliveriesRoute
+  '/app/inventory/health': typeof AppInventoryHealthRoute
+  '/app/inventory/movements': typeof AppInventoryMovementsRoute
+  '/app/inventory/rebuild': typeof AppInventoryRebuildRoute
+  '/app/inventory/reports': typeof AppInventoryReportsRoute
+  '/app/inventory/reservations': typeof AppInventoryReservationsRoute
+  '/app/inventory/stock': typeof AppInventoryStockRoute
+  '/app/inventory/transfers': typeof AppInventoryTransfersRoute
   '/app/obras/$id': typeof AppObrasIdRoute
   '/app/orcamentos/$id': typeof AppOrcamentosIdRoute
   '/app/orcamentos/novo': typeof AppOrcamentosNovoRoute
   '/app/clientes/': typeof AppClientesIndexRoute
+  '/app/compras/': typeof AppComprasIndexRoute
   '/app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/app/empresa/': typeof AppEmpresaIndexRoute
   '/app/equipas/': typeof AppEquipasIndexRoute
+  '/app/fornecedores/': typeof AppFornecedoresIndexRoute
+  '/app/inventory/': typeof AppInventoryIndexRoute
+  '/app/materiais/': typeof AppMateriaisIndexRoute
   '/app/obras/': typeof AppObrasIndexRoute
   '/app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/app/pagamentos/': typeof AppPagamentosIndexRoute
   '/app/presencas/': typeof AppPresencasIndexRoute
   '/app/relatorios/': typeof AppRelatoriosIndexRoute
+  '/app/inventory/deliveries/$deliveryId': typeof AppInventoryDeliveriesDeliveryIdRouteWithChildren
+  '/app/inventory/materials/$materialId': typeof AppInventoryMaterialsMaterialIdRoute
+  '/app/inventory/deliveries/$deliveryId/conferencia': typeof AppInventoryDeliveriesDeliveryIdConferenciaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -161,18 +292,36 @@ export interface FileRoutesByTo {
   '/recuperar-password': typeof RecuperarPasswordRoute
   '/app': typeof AppIndexRoute
   '/app/clientes/$id': typeof AppClientesIdRoute
+  '/app/compras/$purchaseOrderId': typeof AppComprasPurchaseOrderIdRoute
+  '/app/empresa/armazens': typeof AppEmpresaArmazensRoute
+  '/app/inventory/adjustments': typeof AppInventoryAdjustmentsRoute
+  '/app/inventory/deliveries': typeof AppInventoryDeliveriesRoute
+  '/app/inventory/health': typeof AppInventoryHealthRoute
+  '/app/inventory/movements': typeof AppInventoryMovementsRoute
+  '/app/inventory/rebuild': typeof AppInventoryRebuildRoute
+  '/app/inventory/reports': typeof AppInventoryReportsRoute
+  '/app/inventory/reservations': typeof AppInventoryReservationsRoute
+  '/app/inventory/stock': typeof AppInventoryStockRoute
+  '/app/inventory/transfers': typeof AppInventoryTransfersRoute
   '/app/obras/$id': typeof AppObrasIdRoute
   '/app/orcamentos/$id': typeof AppOrcamentosIdRoute
   '/app/orcamentos/novo': typeof AppOrcamentosNovoRoute
   '/app/clientes': typeof AppClientesIndexRoute
+  '/app/compras': typeof AppComprasIndexRoute
   '/app/configuracoes': typeof AppConfiguracoesIndexRoute
   '/app/empresa': typeof AppEmpresaIndexRoute
   '/app/equipas': typeof AppEquipasIndexRoute
+  '/app/fornecedores': typeof AppFornecedoresIndexRoute
+  '/app/inventory': typeof AppInventoryIndexRoute
+  '/app/materiais': typeof AppMateriaisIndexRoute
   '/app/obras': typeof AppObrasIndexRoute
   '/app/orcamentos': typeof AppOrcamentosIndexRoute
   '/app/pagamentos': typeof AppPagamentosIndexRoute
   '/app/presencas': typeof AppPresencasIndexRoute
   '/app/relatorios': typeof AppRelatoriosIndexRoute
+  '/app/inventory/deliveries/$deliveryId': typeof AppInventoryDeliveriesDeliveryIdRouteWithChildren
+  '/app/inventory/materials/$materialId': typeof AppInventoryMaterialsMaterialIdRoute
+  '/app/inventory/deliveries/$deliveryId/conferencia': typeof AppInventoryDeliveriesDeliveryIdConferenciaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -184,18 +333,36 @@ export interface FileRoutesById {
   '/recuperar-password': typeof RecuperarPasswordRoute
   '/app/': typeof AppIndexRoute
   '/app/clientes/$id': typeof AppClientesIdRoute
+  '/app/compras/$purchaseOrderId': typeof AppComprasPurchaseOrderIdRoute
+  '/app/empresa/armazens': typeof AppEmpresaArmazensRoute
+  '/app/inventory/adjustments': typeof AppInventoryAdjustmentsRoute
+  '/app/inventory/deliveries': typeof AppInventoryDeliveriesRoute
+  '/app/inventory/health': typeof AppInventoryHealthRoute
+  '/app/inventory/movements': typeof AppInventoryMovementsRoute
+  '/app/inventory/rebuild': typeof AppInventoryRebuildRoute
+  '/app/inventory/reports': typeof AppInventoryReportsRoute
+  '/app/inventory/reservations': typeof AppInventoryReservationsRoute
+  '/app/inventory/stock': typeof AppInventoryStockRoute
+  '/app/inventory/transfers': typeof AppInventoryTransfersRoute
   '/app/obras/$id': typeof AppObrasIdRoute
   '/app/orcamentos/$id': typeof AppOrcamentosIdRoute
   '/app/orcamentos/novo': typeof AppOrcamentosNovoRoute
   '/app/clientes/': typeof AppClientesIndexRoute
+  '/app/compras/': typeof AppComprasIndexRoute
   '/app/configuracoes/': typeof AppConfiguracoesIndexRoute
   '/app/empresa/': typeof AppEmpresaIndexRoute
   '/app/equipas/': typeof AppEquipasIndexRoute
+  '/app/fornecedores/': typeof AppFornecedoresIndexRoute
+  '/app/inventory/': typeof AppInventoryIndexRoute
+  '/app/materiais/': typeof AppMateriaisIndexRoute
   '/app/obras/': typeof AppObrasIndexRoute
   '/app/orcamentos/': typeof AppOrcamentosIndexRoute
   '/app/pagamentos/': typeof AppPagamentosIndexRoute
   '/app/presencas/': typeof AppPresencasIndexRoute
   '/app/relatorios/': typeof AppRelatoriosIndexRoute
+  '/app/inventory/deliveries_/$deliveryId': typeof AppInventoryDeliveriesDeliveryIdRouteWithChildren
+  '/app/inventory/materials/$materialId': typeof AppInventoryMaterialsMaterialIdRoute
+  '/app/inventory/deliveries_/$deliveryId/conferencia': typeof AppInventoryDeliveriesDeliveryIdConferenciaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -208,18 +375,36 @@ export interface FileRouteTypes {
     | '/recuperar-password'
     | '/app/'
     | '/app/clientes/$id'
+    | '/app/compras/$purchaseOrderId'
+    | '/app/empresa/armazens'
+    | '/app/inventory/adjustments'
+    | '/app/inventory/deliveries'
+    | '/app/inventory/health'
+    | '/app/inventory/movements'
+    | '/app/inventory/rebuild'
+    | '/app/inventory/reports'
+    | '/app/inventory/reservations'
+    | '/app/inventory/stock'
+    | '/app/inventory/transfers'
     | '/app/obras/$id'
     | '/app/orcamentos/$id'
     | '/app/orcamentos/novo'
     | '/app/clientes/'
+    | '/app/compras/'
     | '/app/configuracoes/'
     | '/app/empresa/'
     | '/app/equipas/'
+    | '/app/fornecedores/'
+    | '/app/inventory/'
+    | '/app/materiais/'
     | '/app/obras/'
     | '/app/orcamentos/'
     | '/app/pagamentos/'
     | '/app/presencas/'
     | '/app/relatorios/'
+    | '/app/inventory/deliveries/$deliveryId'
+    | '/app/inventory/materials/$materialId'
+    | '/app/inventory/deliveries/$deliveryId/conferencia'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -229,18 +414,36 @@ export interface FileRouteTypes {
     | '/recuperar-password'
     | '/app'
     | '/app/clientes/$id'
+    | '/app/compras/$purchaseOrderId'
+    | '/app/empresa/armazens'
+    | '/app/inventory/adjustments'
+    | '/app/inventory/deliveries'
+    | '/app/inventory/health'
+    | '/app/inventory/movements'
+    | '/app/inventory/rebuild'
+    | '/app/inventory/reports'
+    | '/app/inventory/reservations'
+    | '/app/inventory/stock'
+    | '/app/inventory/transfers'
     | '/app/obras/$id'
     | '/app/orcamentos/$id'
     | '/app/orcamentos/novo'
     | '/app/clientes'
+    | '/app/compras'
     | '/app/configuracoes'
     | '/app/empresa'
     | '/app/equipas'
+    | '/app/fornecedores'
+    | '/app/inventory'
+    | '/app/materiais'
     | '/app/obras'
     | '/app/orcamentos'
     | '/app/pagamentos'
     | '/app/presencas'
     | '/app/relatorios'
+    | '/app/inventory/deliveries/$deliveryId'
+    | '/app/inventory/materials/$materialId'
+    | '/app/inventory/deliveries/$deliveryId/conferencia'
   id:
     | '__root__'
     | '/'
@@ -251,18 +454,36 @@ export interface FileRouteTypes {
     | '/recuperar-password'
     | '/app/'
     | '/app/clientes/$id'
+    | '/app/compras/$purchaseOrderId'
+    | '/app/empresa/armazens'
+    | '/app/inventory/adjustments'
+    | '/app/inventory/deliveries'
+    | '/app/inventory/health'
+    | '/app/inventory/movements'
+    | '/app/inventory/rebuild'
+    | '/app/inventory/reports'
+    | '/app/inventory/reservations'
+    | '/app/inventory/stock'
+    | '/app/inventory/transfers'
     | '/app/obras/$id'
     | '/app/orcamentos/$id'
     | '/app/orcamentos/novo'
     | '/app/clientes/'
+    | '/app/compras/'
     | '/app/configuracoes/'
     | '/app/empresa/'
     | '/app/equipas/'
+    | '/app/fornecedores/'
+    | '/app/inventory/'
+    | '/app/materiais/'
     | '/app/obras/'
     | '/app/orcamentos/'
     | '/app/pagamentos/'
     | '/app/presencas/'
     | '/app/relatorios/'
+    | '/app/inventory/deliveries_/$deliveryId'
+    | '/app/inventory/materials/$materialId'
+    | '/app/inventory/deliveries_/$deliveryId/conferencia'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -360,6 +581,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/materiais/': {
+      id: '/app/materiais/'
+      path: '/materiais'
+      fullPath: '/app/materiais/'
+      preLoaderRoute: typeof AppMateriaisIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/': {
+      id: '/app/inventory/'
+      path: '/inventory'
+      fullPath: '/app/inventory/'
+      preLoaderRoute: typeof AppInventoryIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/fornecedores/': {
+      id: '/app/fornecedores/'
+      path: '/fornecedores'
+      fullPath: '/app/fornecedores/'
+      preLoaderRoute: typeof AppFornecedoresIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/equipas/': {
       id: '/app/equipas/'
       path: '/equipas'
@@ -379,6 +621,13 @@ declare module '@tanstack/react-router' {
       path: '/configuracoes'
       fullPath: '/app/configuracoes/'
       preLoaderRoute: typeof AppConfiguracoesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/compras/': {
+      id: '/app/compras/'
+      path: '/compras'
+      fullPath: '/app/compras/'
+      preLoaderRoute: typeof AppComprasIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/clientes/': {
@@ -409,6 +658,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppObrasIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inventory/transfers': {
+      id: '/app/inventory/transfers'
+      path: '/inventory/transfers'
+      fullPath: '/app/inventory/transfers'
+      preLoaderRoute: typeof AppInventoryTransfersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/stock': {
+      id: '/app/inventory/stock'
+      path: '/inventory/stock'
+      fullPath: '/app/inventory/stock'
+      preLoaderRoute: typeof AppInventoryStockRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/reservations': {
+      id: '/app/inventory/reservations'
+      path: '/inventory/reservations'
+      fullPath: '/app/inventory/reservations'
+      preLoaderRoute: typeof AppInventoryReservationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/reports': {
+      id: '/app/inventory/reports'
+      path: '/inventory/reports'
+      fullPath: '/app/inventory/reports'
+      preLoaderRoute: typeof AppInventoryReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/rebuild': {
+      id: '/app/inventory/rebuild'
+      path: '/inventory/rebuild'
+      fullPath: '/app/inventory/rebuild'
+      preLoaderRoute: typeof AppInventoryRebuildRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/movements': {
+      id: '/app/inventory/movements'
+      path: '/inventory/movements'
+      fullPath: '/app/inventory/movements'
+      preLoaderRoute: typeof AppInventoryMovementsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/health': {
+      id: '/app/inventory/health'
+      path: '/inventory/health'
+      fullPath: '/app/inventory/health'
+      preLoaderRoute: typeof AppInventoryHealthRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/deliveries': {
+      id: '/app/inventory/deliveries'
+      path: '/inventory/deliveries'
+      fullPath: '/app/inventory/deliveries'
+      preLoaderRoute: typeof AppInventoryDeliveriesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/adjustments': {
+      id: '/app/inventory/adjustments'
+      path: '/inventory/adjustments'
+      fullPath: '/app/inventory/adjustments'
+      preLoaderRoute: typeof AppInventoryAdjustmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/empresa/armazens': {
+      id: '/app/empresa/armazens'
+      path: '/empresa/armazens'
+      fullPath: '/app/empresa/armazens'
+      preLoaderRoute: typeof AppEmpresaArmazensRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/compras/$purchaseOrderId': {
+      id: '/app/compras/$purchaseOrderId'
+      path: '/compras/$purchaseOrderId'
+      fullPath: '/app/compras/$purchaseOrderId'
+      preLoaderRoute: typeof AppComprasPurchaseOrderIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/app/clientes/$id': {
       id: '/app/clientes/$id'
       path: '/clientes/$id'
@@ -416,41 +742,112 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientesIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/app/inventory/materials/$materialId': {
+      id: '/app/inventory/materials/$materialId'
+      path: '/inventory/materials/$materialId'
+      fullPath: '/app/inventory/materials/$materialId'
+      preLoaderRoute: typeof AppInventoryMaterialsMaterialIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/deliveries_/$deliveryId': {
+      id: '/app/inventory/deliveries_/$deliveryId'
+      path: '/inventory/deliveries/$deliveryId'
+      fullPath: '/app/inventory/deliveries/$deliveryId'
+      preLoaderRoute: typeof AppInventoryDeliveriesDeliveryIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/inventory/deliveries_/$deliveryId/conferencia': {
+      id: '/app/inventory/deliveries_/$deliveryId/conferencia'
+      path: '/conferencia'
+      fullPath: '/app/inventory/deliveries/$deliveryId/conferencia'
+      preLoaderRoute: typeof AppInventoryDeliveriesDeliveryIdConferenciaRouteImport
+      parentRoute: typeof AppInventoryDeliveriesDeliveryIdRoute
+    }
   }
 }
+
+interface AppInventoryDeliveriesDeliveryIdRouteChildren {
+  AppInventoryDeliveriesDeliveryIdConferenciaRoute: typeof AppInventoryDeliveriesDeliveryIdConferenciaRoute
+}
+
+const AppInventoryDeliveriesDeliveryIdRouteChildren: AppInventoryDeliveriesDeliveryIdRouteChildren =
+  {
+    AppInventoryDeliveriesDeliveryIdConferenciaRoute:
+      AppInventoryDeliveriesDeliveryIdConferenciaRoute,
+  }
+
+const AppInventoryDeliveriesDeliveryIdRouteWithChildren =
+  AppInventoryDeliveriesDeliveryIdRoute._addFileChildren(
+    AppInventoryDeliveriesDeliveryIdRouteChildren,
+  )
 
 interface AppRouteChildren {
   AppIndexRoute: typeof AppIndexRoute
   AppClientesIdRoute: typeof AppClientesIdRoute
+  AppComprasPurchaseOrderIdRoute: typeof AppComprasPurchaseOrderIdRoute
+  AppEmpresaArmazensRoute: typeof AppEmpresaArmazensRoute
+  AppInventoryAdjustmentsRoute: typeof AppInventoryAdjustmentsRoute
+  AppInventoryDeliveriesRoute: typeof AppInventoryDeliveriesRoute
+  AppInventoryHealthRoute: typeof AppInventoryHealthRoute
+  AppInventoryMovementsRoute: typeof AppInventoryMovementsRoute
+  AppInventoryRebuildRoute: typeof AppInventoryRebuildRoute
+  AppInventoryReportsRoute: typeof AppInventoryReportsRoute
+  AppInventoryReservationsRoute: typeof AppInventoryReservationsRoute
+  AppInventoryStockRoute: typeof AppInventoryStockRoute
+  AppInventoryTransfersRoute: typeof AppInventoryTransfersRoute
   AppObrasIdRoute: typeof AppObrasIdRoute
   AppOrcamentosIdRoute: typeof AppOrcamentosIdRoute
   AppOrcamentosNovoRoute: typeof AppOrcamentosNovoRoute
   AppClientesIndexRoute: typeof AppClientesIndexRoute
+  AppComprasIndexRoute: typeof AppComprasIndexRoute
   AppConfiguracoesIndexRoute: typeof AppConfiguracoesIndexRoute
   AppEmpresaIndexRoute: typeof AppEmpresaIndexRoute
   AppEquipasIndexRoute: typeof AppEquipasIndexRoute
+  AppFornecedoresIndexRoute: typeof AppFornecedoresIndexRoute
+  AppInventoryIndexRoute: typeof AppInventoryIndexRoute
+  AppMateriaisIndexRoute: typeof AppMateriaisIndexRoute
   AppObrasIndexRoute: typeof AppObrasIndexRoute
   AppOrcamentosIndexRoute: typeof AppOrcamentosIndexRoute
   AppPagamentosIndexRoute: typeof AppPagamentosIndexRoute
   AppPresencasIndexRoute: typeof AppPresencasIndexRoute
   AppRelatoriosIndexRoute: typeof AppRelatoriosIndexRoute
+  AppInventoryDeliveriesDeliveryIdRoute: typeof AppInventoryDeliveriesDeliveryIdRouteWithChildren
+  AppInventoryMaterialsMaterialIdRoute: typeof AppInventoryMaterialsMaterialIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppIndexRoute: AppIndexRoute,
   AppClientesIdRoute: AppClientesIdRoute,
+  AppComprasPurchaseOrderIdRoute: AppComprasPurchaseOrderIdRoute,
+  AppEmpresaArmazensRoute: AppEmpresaArmazensRoute,
+  AppInventoryAdjustmentsRoute: AppInventoryAdjustmentsRoute,
+  AppInventoryDeliveriesRoute: AppInventoryDeliveriesRoute,
+  AppInventoryHealthRoute: AppInventoryHealthRoute,
+  AppInventoryMovementsRoute: AppInventoryMovementsRoute,
+  AppInventoryRebuildRoute: AppInventoryRebuildRoute,
+  AppInventoryReportsRoute: AppInventoryReportsRoute,
+  AppInventoryReservationsRoute: AppInventoryReservationsRoute,
+  AppInventoryStockRoute: AppInventoryStockRoute,
+  AppInventoryTransfersRoute: AppInventoryTransfersRoute,
   AppObrasIdRoute: AppObrasIdRoute,
   AppOrcamentosIdRoute: AppOrcamentosIdRoute,
   AppOrcamentosNovoRoute: AppOrcamentosNovoRoute,
   AppClientesIndexRoute: AppClientesIndexRoute,
+  AppComprasIndexRoute: AppComprasIndexRoute,
   AppConfiguracoesIndexRoute: AppConfiguracoesIndexRoute,
   AppEmpresaIndexRoute: AppEmpresaIndexRoute,
   AppEquipasIndexRoute: AppEquipasIndexRoute,
+  AppFornecedoresIndexRoute: AppFornecedoresIndexRoute,
+  AppInventoryIndexRoute: AppInventoryIndexRoute,
+  AppMateriaisIndexRoute: AppMateriaisIndexRoute,
   AppObrasIndexRoute: AppObrasIndexRoute,
   AppOrcamentosIndexRoute: AppOrcamentosIndexRoute,
   AppPagamentosIndexRoute: AppPagamentosIndexRoute,
   AppPresencasIndexRoute: AppPresencasIndexRoute,
   AppRelatoriosIndexRoute: AppRelatoriosIndexRoute,
+  AppInventoryDeliveriesDeliveryIdRoute:
+    AppInventoryDeliveriesDeliveryIdRouteWithChildren,
+  AppInventoryMaterialsMaterialIdRoute: AppInventoryMaterialsMaterialIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

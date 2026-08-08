@@ -9,13 +9,20 @@ import {
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useObraMZStore } from "@/store/obramz-store";
 import { toast } from "sonner";
-import { Search, Calendar, AlertCircle, Users, Check, X, Clock, HelpCircle, User, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Search, Calendar, AlertCircle, Users, Check, X, Clock, HelpCircle, User,
+  FileText, ChevronDown, ChevronUp, UserPlus, Ban, Copy, RotateCcw, AlertTriangle, CheckCircle2, XCircle
+} from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { calculateWorkedMinutes, validateTimeFields, formatMins } from "@/lib/time-utils";
 import { resolveWorkersScheduledForDate, type AttendanceSchedule } from "@/lib/attendance-schedule";
+import { calculateAttendanceLabourCost } from "@/lib/attendance-labour-cost";
+import { AttendanceExtraWorkerDialog } from "./attendance-extra-worker-dialog";
+import { AttendanceDisableDayDialog } from "./attendance-disable-day-dialog";
 
 type AttendanceRollCallDialogProps = {
   open: boolean;
@@ -42,6 +49,8 @@ interface RollCallWorkerItem {
   initialCheckOut: string;
   initialBreak: number;
   initialOvertime: number;
+  isExtra?: boolean;
+  extraReason?: string;
 }
 
 export function AttendanceRollCallDialog({
@@ -57,6 +66,8 @@ export function AttendanceRollCallDialog({
   const projectAssignments = useObraMZStore((s) => s.projectAssignments || []);
   const attendanceSchedules = useObraMZStore((s) => s.attendanceSchedules || []);
   const attendanceRecords = useObraMZStore((s) => s.attendanceRecords || []);
+  const disabledProjectDays = useObraMZStore((s) => s.disabledProjectDays || []);
+  const enableProjectDay = useObraMZStore((s) => s.enableProjectDay);
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -65,6 +76,17 @@ export function AttendanceRollCallDialog({
   const [workersList, setWorkersList] = useState<RollCallWorkerItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [projectSearch, setProjectSearch] = useState("");
+  const [workerSearch, setWorkerSearch] = useState("");
+
+  const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
+  const [extraWorkerDialogOpen, setExtraWorkerDialogOpen] = useState(false);
+  const [disableDayDialogOpen, setDisableDayDialogOpen] = useState(false);
+
+  // Verificação de dia desativado
+  const currentDisabledRecord = useMemo(() => {
+    if (!projectId || !date) return undefined;
+    return disabledProjectDays.find((d) => d.projectId === projectId && d.date === date);
+  }, [disabledProjectDays, projectId, date]);
 
   // Inicializar data e obra
   useEffect(() => {
@@ -74,6 +96,8 @@ export function AttendanceRollCallDialog({
       setWorkersList([]);
       setIsSaving(false);
       setProjectSearch("");
+      setWorkerSearch("");
+      setCollapsedTeams({});
     }
   }, [open, preselectedDate, preselectedProjectId, todayStr]);
 
@@ -119,49 +143,272 @@ export function AttendanceRollCallDialog({
     });
   }, [date, projectId, attendanceSchedules, projectAssignments, workers, teams]);
 
-  // 2. Mapear trabalhadores elegíveis para itens de chamada (se existirem na base de dados, carrega status; senão, inicia como "present")
+  // 2. Mapear trabalhadores elegíveis para itens de chamada
   useEffect(() => {
     if (!date || !projectId) {
       setWorkersList([]);
       return;
     }
 
-    const list = eligibleWorkers.map((ew) => {
+    const items: RollCallWorkerItem[] = eligibleWorkers.map((item) => {
       const existing = attendanceRecords.find(
-        (r) => r.workerId === ew.worker.id && r.projectId === projectId && r.date === date
+        (r) => r.projectId === projectId && r.date === date && r.workerId === item.worker.id
       );
 
-      const statusVal = existing ? existing.status : "present";
-      const notesVal = existing?.notes || "";
-      const checkInVal = existing?.checkInTime || "";
-      const checkOutVal = existing?.checkOutTime || "";
-      const breakVal = existing?.breakMinutes || 0;
-      const overtimeVal = existing?.overtimeMinutes || 0;
+      const st = existing ? existing.status : "present";
+      const nt = existing ? existing.notes || "" : "";
+      const inT = existing?.checkInTime || "07:30";
+      const outT = existing?.checkOutTime || "17:00";
+      const brk = existing?.breakMinutes ?? 60;
+      const ovt = existing?.overtimeMinutes ?? 0;
 
       return {
-        worker: ew.worker,
-        assignment: ew.assignment,
-        team: ew.team,
-        status: statusVal,
-        notes: notesVal,
-        checkInTime: checkInVal,
-        checkOutTime: checkOutVal,
-        breakMinutes: breakVal,
-        overtimeMinutes: overtimeVal,
-        showHours: !!(checkInVal || overtimeVal),
-        initialStatus: statusVal,
-        initialNotes: notesVal,
-        initialCheckIn: checkInVal,
-        initialCheckOut: checkOutVal,
-        initialBreak: breakVal,
-        initialOvertime: overtimeVal,
+        worker: item.worker,
+        assignment: item.assignment,
+        schedule: item.schedule,
+        team: item.team,
+        status: st,
+        notes: nt,
+        checkInTime: inT,
+        checkOutTime: outT,
+        breakMinutes: brk,
+        overtimeMinutes: ovt,
+        showHours: existing ? !!(existing.checkInTime && existing.checkOutTime) : false,
+        initialStatus: st,
+        initialNotes: nt,
+        initialCheckIn: inT,
+        initialCheckOut: outT,
+        initialBreak: brk,
+        initialOvertime: ovt,
+        isExtra: false,
       };
     });
 
-    setWorkersList(list);
-  }, [date, projectId, eligibleWorkers, attendanceRecords]);
+    setWorkersList(items);
+  }, [eligibleWorkers, date, projectId, attendanceRecords]);
 
-  // Verificar se existem alterações não guardadas
+  // Filtrar trabalhadores por pesquisa instantânea
+  const filteredWorkersList = useMemo(() => {
+    if (!workerSearch.trim()) return workersList;
+    const q = workerSearch.toLowerCase().trim();
+    return workersList.filter((item) => {
+      const nameMatch = item.worker.name.toLowerCase().includes(q);
+      const roleMatch = item.worker.role.toLowerCase().includes(q);
+      const teamMatch = item.team ? item.team.name.toLowerCase().includes(q) : false;
+      return nameMatch || roleMatch || teamMatch;
+    });
+  }, [workersList, workerSearch]);
+
+  // Agrupar por equipa
+  const groupedTeamsMap = useMemo(() => {
+    const map = new Map<string, RollCallWorkerItem[]>();
+    filteredWorkersList.forEach((item) => {
+      const groupName = item.team ? item.team.name : "Sem Equipa";
+      if (!map.has(groupName)) map.set(groupName, []);
+      map.get(groupName)!.push(item);
+    });
+    return map;
+  }, [filteredWorkersList]);
+
+  // Contadores em Tempo Real
+  const counts = useMemo(() => {
+    let present = 0;
+    let absent = 0;
+    let justified = 0;
+    let total = workersList.length;
+
+    workersList.forEach((item) => {
+      if (item.status === "present" || item.status === "late" || item.status === "half_day") {
+        present++;
+      } else if (item.status === "absent") {
+        absent++;
+      } else if (item.status === "justified_absence") {
+        justified++;
+      }
+    });
+
+    return { present, absent, justified, total };
+  }, [workersList]);
+
+  // Modificações globais em lote
+  const handleMarkAllPresent = () => {
+    setWorkersList((prev) => prev.map((item) => ({ ...item, status: "present" })));
+    toast.success("Todos os trabalhadores marcados como Presentes.");
+  };
+
+  const handleMarkAllAbsent = () => {
+    setWorkersList((prev) => prev.map((item) => ({ ...item, status: "absent" })));
+    toast.success("Todos os trabalhadores marcados como Ausentes.");
+  };
+
+  const handleClearAll = () => {
+    setWorkersList((prev) =>
+      prev.map((item) => ({
+        ...item,
+        status: item.initialStatus,
+        notes: item.initialNotes,
+      }))
+    );
+    toast.info("Marcações da chamada repostas.");
+  };
+
+  // Copiar Chamada de Ontem
+  const handleCopyYesterday = () => {
+    if (!date || !projectId) return;
+
+    const parts = date.split("-");
+    const dObj = new Date(parseInt(parts[0]!, 10), parseInt(parts[1]!, 10) - 1, parseInt(parts[2]!, 10));
+    dObj.setDate(dObj.getDate() - 1);
+
+    const yYear = dObj.getFullYear();
+    const yMonth = String(dObj.getMonth() + 1).padStart(2, "0");
+    const yDay = String(dObj.getDate()).padStart(2, "0");
+    const yesterdayStr = `${yYear}-${yMonth}-${yDay}`;
+
+    const prevRecords = attendanceRecords.filter(
+      (r) => r.projectId === projectId && r.date === yesterdayStr
+    );
+
+    if (prevRecords.length === 0) {
+      toast.error(`Nenhuma chamada anterior encontrada para a data de ontem (${yesterdayStr}).`);
+      return;
+    }
+
+    const prevMap = new Map(prevRecords.map((r) => [r.workerId, r]));
+    let copiedCount = 0;
+
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        const prevRecord = prevMap.get(item.worker.id);
+        if (prevRecord) {
+          copiedCount++;
+          return {
+            ...item,
+            status: prevRecord.status,
+            notes: prevRecord.notes || item.notes,
+            checkInTime: prevRecord.checkInTime || item.checkInTime,
+            checkOutTime: prevRecord.checkOutTime || item.checkOutTime,
+            breakMinutes: prevRecord.breakMinutes ?? item.breakMinutes,
+            overtimeMinutes: prevRecord.overtimeMinutes ?? item.overtimeMinutes,
+          };
+        }
+        return item;
+      })
+    );
+
+    toast.success(`Chamada de ontem (${yesterdayStr}) copiada! ${copiedCount} trabalhadores preenchidos.`);
+  };
+
+  // Modificações por Equipa
+  const handleMarkTeamStatus = (groupName: string, targetStatus: AttendanceStatus) => {
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        const itemTeamName = item.team ? item.team.name : "Sem Equipa";
+        if (itemTeamName === groupName) {
+          return { ...item, status: targetStatus };
+        }
+        return item;
+      })
+    );
+    toast.success(`Equipa "${groupName}": marcada como ${targetStatus === "present" ? "Presente" : "Ausente"}.`);
+  };
+
+  const handleClearTeamStatus = (groupName: string) => {
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        const itemTeamName = item.team ? item.team.name : "Sem Equipa";
+        if (itemTeamName === groupName) {
+          return { ...item, status: item.initialStatus, notes: item.initialNotes };
+        }
+        return item;
+      })
+    );
+    toast.info(`Equipa "${groupName}": marcações repostas.`);
+  };
+
+  const toggleTeamCollapse = (groupName: string) => {
+    setCollapsedTeams((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
+  };
+
+  // Adicionar Trabalhador Extraordinário
+  const handleAddExtraWorker = (extraWorker: Worker, reason: string, customNotes?: string) => {
+    const newItem: RollCallWorkerItem = {
+      worker: extraWorker,
+      status: "present",
+      notes: customNotes ? `Reforço (${reason}): ${customNotes}` : `Reforço (${reason})`,
+      checkInTime: "07:30",
+      checkOutTime: "17:00",
+      breakMinutes: 60,
+      overtimeMinutes: 0,
+      showHours: false,
+      initialStatus: "present",
+      initialNotes: "",
+      initialCheckIn: "07:30",
+      initialCheckOut: "17:00",
+      initialBreak: 60,
+      initialOvertime: 0,
+      isExtra: true,
+      extraReason: reason,
+    };
+
+    setWorkersList((prev) => [newItem, ...prev]);
+  };
+
+  const handleReenableDay = () => {
+    if (!projectId || !date) return;
+    enableProjectDay(projectId, date);
+    toast.success("Dia reativado com sucesso para presenças!");
+  };
+
+  // Atualizar estado individual de um operário
+  const handleStatusChange = (workerId: string, status: AttendanceStatus) => {
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        if (item.worker.id === workerId) {
+          return { ...item, status };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleNotesChange = (workerId: string, notes: string) => {
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        if (item.worker.id === workerId) {
+          return { ...item, notes };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleTimeChange = (
+    workerId: string,
+    field: "checkInTime" | "checkOutTime" | "breakMinutes" | "overtimeMinutes",
+    value: any
+  ) => {
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        if (item.worker.id === workerId) {
+          return { ...item, [field]: value };
+        }
+        return item;
+      })
+    );
+  };
+
+  const toggleShowHours = (workerId: string) => {
+    setWorkersList((prev) =>
+      prev.map((item) => {
+        if (item.worker.id === workerId) {
+          return { ...item, showHours: !item.showHours };
+        }
+        return item;
+      })
+    );
+  };
+
   const hasChanges = useMemo(() => {
     return workersList.some(
       (item) =>
@@ -170,122 +417,32 @@ export function AttendanceRollCallDialog({
         item.checkInTime !== item.initialCheckIn ||
         item.checkOutTime !== item.initialCheckOut ||
         item.breakMinutes !== item.initialBreak ||
-        item.overtimeMinutes !== item.initialOvertime
+        item.overtimeMinutes !== item.initialOvertime ||
+        item.isExtra
     );
   }, [workersList]);
 
-  // Mudar de data com validação de alterações descartadas
-  const handleDateChange = (newVal: string) => {
-    if (hasChanges) {
-      const discard = window.confirm("Existem alterações não guardadas na chamada diária. Deseja descartá-las?");
-      if (!discard) return;
+  // Guardar Chamada Diária
+  const handleSave = () => {
+    if (!date) {
+      toast.error("Por favor, selecione uma data válida.");
+      return;
     }
-    setDate(newVal);
-  };
-
-  // Mudar de obra com validação de alterações descartadas
-  const handleProjectChange = (newVal: string) => {
-    if (hasChanges) {
-      const discard = window.confirm("Existem alterações não guardadas na chamada diária. Deseja descartá-las?");
-      if (!discard) return;
+    if (!projectId) {
+      toast.error("Por favor, selecione uma obra para efetuar a chamada.");
+      return;
     }
-    setProjectId(newVal);
-  };
 
-  // Modificar estado de presença de um trabalhador com confirmações de limpeza de horas
-  const updateWorkerStatus = (workerId: string, newStatus: AttendanceStatus) => {
-    setWorkersList((prev) =>
-      prev.map((item) => {
-        if (item.worker.id === workerId) {
-          // Se o estado não permitir horas e houver horas preenchidas, pedir confirmação
-          if (newStatus === "absent" || newStatus === "justified_absence") {
-            const hasHoursData = item.checkInTime || item.checkOutTime || item.breakMinutes > 0 || item.overtimeMinutes > 0;
-            if (hasHoursData) {
-              const confirmClear = window.confirm(
-                `Alterar o estado de ${item.worker.name} para ${newStatus === "absent" ? "Ausente" : "Falta Justificada"} irá apagar as horas registadas para este trabalhador. Deseja continuar?`
-              );
-              if (!confirmClear) return item;
-            }
-            return {
-              ...item,
-              status: newStatus,
-              checkInTime: "",
-              checkOutTime: "",
-              breakMinutes: 0,
-              overtimeMinutes: 0,
-              showHours: false,
-            };
+    // Se o dia não estiver desativado, validar campos de horário se ativados
+    if (!currentDisabledRecord) {
+      for (const item of workersList) {
+        const allowsHours = item.status === "present" || item.status === "late" || item.status === "half_day";
+        if (allowsHours && item.showHours) {
+          const err = validateTimeFields(item.checkInTime, item.checkOutTime, item.breakMinutes);
+          if (err) {
+            toast.error(`Trabalhador ${item.worker.name}: ${err}`);
+            return;
           }
-          return { ...item, status: newStatus };
-        }
-        return item;
-      })
-    );
-  };
-
-  // Modificar nota de um trabalhador
-  const updateWorkerNotes = (workerId: string, newNotes: string) => {
-    setWorkersList((prev) =>
-      prev.map((item) =>
-        item.worker.id === workerId ? { ...item, notes: newNotes } : item
-      )
-    );
-  };
-
-  // Modificar horas de um trabalhador
-  const updateWorkerHours = (
-    workerId: string,
-    field: "checkInTime" | "checkOutTime" | "breakMinutes" | "overtimeMinutes",
-    value: any
-  ) => {
-    setWorkersList((prev) =>
-      prev.map((item) =>
-        item.worker.id === workerId ? { ...item, [field]: value } : item
-      )
-    );
-  };
-
-  // Expandir/recolher seção de horas por trabalhador
-  const toggleWorkerHours = (workerId: string) => {
-    setWorkersList((prev) =>
-      prev.map((item) => {
-        if (item.worker.id === workerId) {
-          // Bloquear se o trabalhador estiver ausente
-          const isAbsent = item.status === "absent" || item.status === "justified_absence";
-          if (isAbsent && !item.showHours) {
-            toast.error("Não é possível registar horas para trabalhadores ausentes ou em falta justificada.");
-            return item;
-          }
-          return { ...item, showHours: !item.showHours };
-        }
-        return item;
-      })
-    );
-  };
-
-  // Resumo em tempo real da chamada
-  const summary = useMemo(() => {
-    const total = workersList.length;
-    const present = workersList.filter((item) => item.status === "present").length;
-    const absent = workersList.filter((item) => item.status === "absent").length;
-    const late = workersList.filter((item) => item.status === "late").length;
-    const halfDay = workersList.filter((item) => item.status === "half_day").length;
-
-    return { total, present, absent, late, halfDay };
-  }, [workersList]);
-
-  // Gravar chamada em massa (Upsert)
-  const handleSave = async () => {
-    if (!projectId || !date || workersList.length === 0) return;
-
-    // Validar tempos de cada trabalhador
-    for (const item of workersList) {
-      const allowsHours = item.status === "present" || item.status === "late" || item.status === "half_day";
-      if (allowsHours && (item.checkInTime || item.checkOutTime || item.overtimeMinutes > 0)) {
-        const error = validateTimeFields(item.checkInTime, item.checkOutTime, item.breakMinutes, item.overtimeMinutes);
-        if (error) {
-          toast.error(`Erro no trabalhador ${item.worker.name}: ${error}`);
-          return;
         }
       }
     }
@@ -296,9 +453,38 @@ export function AttendanceRollCallDialog({
       const allowsHours = item.status === "present" || item.status === "late" || item.status === "half_day";
       const hasTime = item.checkInTime && item.checkOutTime;
 
+      const existing = attendanceRecords.find(
+        (r) => r.projectId === projectId && r.date === date && r.workerId === item.worker.id
+      );
+
+      const costResult = calculateAttendanceLabourCost({
+        status: item.status,
+        paymentType: item.worker.paymentType,
+        dailyRate: item.worker.dailyRate,
+        hourlyRate: item.worker.hourlyRate,
+        monthlyRate: item.worker.monthlyRate,
+        overtimeHourlyRate: item.worker.overtimeHourlyRate,
+        currency: item.worker.currency,
+        defaultWorkingHours: item.worker.defaultWorkingHours,
+        checkInTime: allowsHours && hasTime ? item.checkInTime : undefined,
+        checkOutTime: allowsHours && hasTime ? item.checkOutTime : undefined,
+        breakMinutes: allowsHours && hasTime ? item.breakMinutes : undefined,
+        existingSnapshot: existing?.costCalculationVersion
+          ? {
+              paymentTypeSnapshot: existing.paymentTypeSnapshot,
+              dailyRateSnapshot: existing.dailyRateSnapshot,
+              hourlyRateSnapshot: existing.hourlyRateSnapshot,
+              monthlyRateSnapshot: existing.monthlyRateSnapshot,
+              overtimeHourlyRateSnapshot: existing.overtimeHourlyRateSnapshot,
+              currencySnapshot: existing.currencySnapshot,
+              defaultWorkingHoursSnapshot: existing.defaultWorkingHoursSnapshot,
+            }
+          : undefined,
+      });
+
       return {
         projectId,
-        phaseId: undefined, // Sem fase na chamada em massa por defeito
+        phaseId: undefined,
         workerId: item.worker.id,
         teamId: item.team?.id,
         assignmentId: item.assignment?.id || item.schedule?.assignmentId,
@@ -310,12 +496,32 @@ export function AttendanceRollCallDialog({
         breakMinutes: allowsHours && hasTime ? item.breakMinutes : undefined,
         workedMinutes: allowsHours && hasTime ? calculateWorkedMinutes(item.checkInTime, item.checkOutTime, item.breakMinutes) : undefined,
         overtimeMinutes: allowsHours && item.overtimeMinutes > 0 ? item.overtimeMinutes : undefined,
+
+        // Horas e Custos Operacionais
+        regularHours: costResult.regularHours,
+        overtimeHours: costResult.overtimeHours,
+        workedHours: costResult.workedHours,
+        regularLabourCost: costResult.regularLabourCost,
+        overtimeLabourCost: costResult.overtimeLabourCost,
+        labourCost: costResult.labourCost,
+
+        // Snapshots Imutáveis
+        paymentTypeSnapshot: costResult.paymentTypeSnapshot,
+        dailyRateSnapshot: costResult.dailyRateSnapshot,
+        hourlyRateSnapshot: costResult.hourlyRateSnapshot,
+        monthlyRateSnapshot: costResult.monthlyRateSnapshot,
+        overtimeHourlyRateSnapshot: costResult.overtimeHourlyRateSnapshot,
+        currencySnapshot: costResult.currencySnapshot,
+        defaultWorkingHoursSnapshot: costResult.defaultWorkingHoursSnapshot,
+
+        costCalculatedAt: existing?.costCalculatedAt || new Date().toISOString(),
+        costCalculationVersion: 1,
       };
     });
 
     try {
       const result = bulkUpsertAttendanceRecords(payloads);
-      
+
       if (result.created === 0 && result.updated === 0) {
         toast.info("Nenhuma alteração necessária.");
       } else {
@@ -330,294 +536,443 @@ export function AttendanceRollCallDialog({
     }
   };
 
-  // Tratar fecho do diálogo se houver alterações
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen && hasChanges) {
-      const discard = window.confirm("Existem alterações não guardadas. Tem a certeza de que pretende sair?");
+      const discard = window.confirm("Existem alterações não guardadas na chamada. Tem a certeza de que pretende sair?");
       if (!discard) return;
     }
     onOpenChange(isOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[92vh] flex flex-col p-0">
-        <DialogHeader className="px-5 pt-5 pb-2">
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Chamada Diária da Obra
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-4xl w-full max-h-[92vh] flex flex-col p-0 overflow-hidden">
+          {/* Cabeçalho */}
+          <DialogHeader className="p-4 sm:p-5 border-b bg-muted/20 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <DialogTitle className="text-base font-bold flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" /> Chamada Diária
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Registo em lote de presenças para todos os trabalhadores agendados na obra.
+                </p>
+              </div>
 
-        {/* Seletores Principais */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-5 pb-3 border-b">
-          <div className="space-y-1">
-            <Label htmlFor="rc-date">Data da Chamada *</Label>
-            <Input
-              id="rc-date"
-              type="date"
-              max={todayStr}
-              value={date}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="text-xs h-9"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label htmlFor="rc-project">Obra *</Label>
-            <Select value={projectId} onValueChange={handleProjectChange}>
-              <SelectTrigger id="rc-project" className="text-xs h-9">
-                <SelectValue placeholder="Escolher obra..." />
-              </SelectTrigger>
-              <SelectContent>
-                <div className="px-2 pb-1.5 pt-1 border-b">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder="Pesquisar obra..."
-                      value={projectSearch}
-                      onChange={(e) => setProjectSearch(e.target.value)}
-                      className="pl-8 h-8 text-xs"
-                    />
-                  </div>
-                </div>
-                {filteredObras.length === 0 ? (
-                  <div className="text-center text-xs text-muted-foreground py-3">
-                    Nenhuma obra ativa.
-                  </div>
-                ) : (
-                  filteredObras.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.nome}
-                    </SelectItem>
-                  ))
+              {/* Contadores em Tempo Real */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30">
+                  <CheckCircle2 className="h-3 w-3 mr-1" /> {counts.present} Presentes
+                </Badge>
+                <Badge variant="outline" className="text-[10px] bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30">
+                  <XCircle className="h-3 w-3 mr-1" /> {counts.absent} Ausentes
+                </Badge>
+                {counts.justified > 0 && (
+                  <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30">
+                    {counts.justified} Licenças
+                  </Badge>
                 )}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+                <Badge variant="secondary" className="text-[10px] font-bold">
+                  Total: {counts.total}
+                </Badge>
+              </div>
+            </div>
 
-        {/* Resumo da chamada */}
-        {projectId && date && workersList.length > 0 && (
-          <div className="bg-muted/40 px-5 py-2.5 border-b grid grid-cols-5 gap-2 text-center text-xs">
-            <div className="space-y-0.5 border-r border-border/60">
-              <div className="text-[10px] text-muted-foreground uppercase font-bold">Total</div>
-              <div className="font-black text-foreground text-sm">{summary.total}</div>
-            </div>
-            <div className="space-y-0.5 border-r border-border/60">
-              <div className="text-[10px] text-emerald-600 uppercase font-bold">Presentes</div>
-              <div className="font-black text-emerald-600 text-sm">{summary.present}</div>
-            </div>
-            <div className="space-y-0.5 border-r border-border/60">
-              <div className="text-[10px] text-rose-600 uppercase font-bold">Ausentes</div>
-              <div className="font-black text-rose-600 text-sm">{summary.absent}</div>
-            </div>
-            <div className="space-y-0.5 border-r border-border/60">
-              <div className="text-[10px] text-amber-600 uppercase font-bold">Atrasados</div>
-              <div className="font-black text-amber-600 text-sm">{summary.late}</div>
-            </div>
-            <div className="space-y-0.5">
-              <div className="text-[10px] text-sky-600 uppercase font-bold">Meio Dia</div>
-              <div className="font-black text-sky-600 text-sm">{summary.halfDay}</div>
-            </div>
-          </div>
-        )}
+            {/* Seleção de Obra e Data */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Data da Chamada *</Label>
+                <div className="relative">
+                  <Calendar className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="h-9 pl-8 text-xs font-medium"
+                  />
+                </div>
+              </div>
 
-        {/* Listagem de Operários */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {!projectId || !date ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center text-xs text-muted-foreground">
-              <Calendar className="h-8 w-8 mb-2 opacity-50" />
-              <span>Selecione a data e a obra para carregar a lista de chamada.</span>
-            </div>
-          ) : workersList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center text-xs text-muted-foreground">
-              <AlertCircle className="h-8 w-8 mb-2 text-amber-500 opacity-85" />
-              <span>Não existem trabalhadores elegíveis nesta obra para a data selecionada.</span>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {workersList.map((item) => {
-                const calculated = calculateWorkedMinutes(item.checkInTime, item.checkOutTime, item.breakMinutes);
-                const isAbsentStatus = item.status === "absent" || item.status === "justified_absence";
-
-                return (
-                  <div
-                    key={item.worker.id}
-                    className="flex flex-col p-3 border rounded-lg bg-card gap-2.5 hover:shadow-xs transition-shadow"
-                  >
-                    {/* Linha Principal (Avatar + Nome + Botoes de Presença + Relógio) */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <Avatar className="h-8 w-8">
-                          {item.worker.photo ? (
-                            <img src={item.worker.photo} alt={item.worker.name} className="object-cover" />
-                          ) : (
-                            <AvatarFallback className="bg-muted text-[10px] font-bold">
-                              {initials(item.worker.name)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="min-w-0 flex flex-col">
-                          <span className="font-bold text-xs text-foreground truncate">{item.worker.name}</span>
-                          <span className="text-[9px] text-muted-foreground">
-                            {item.worker.role} •{" "}
-                            {item.team ? (
-                              <span className="text-primary font-semibold">{item.team.name}</span>
-                            ) : (
-                              "Atribuição Individual"
-                            )}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Selector de Presença e Botão de Relógio */}
-                      <div className="flex items-center gap-2 self-end sm:self-auto">
-                        <div className="flex items-center bg-muted/80 p-0.5 rounded-lg border gap-0.5">
-                          <button
-                            onClick={() => updateWorkerStatus(item.worker.id, "present")}
-                            className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all ${
-                              item.status === "present"
-                                ? "bg-emerald-600 text-white shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Presente
-                          </button>
-                          <button
-                            onClick={() => updateWorkerStatus(item.worker.id, "absent")}
-                            className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all ${
-                              item.status === "absent"
-                                ? "bg-rose-600 text-white shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Ausente
-                          </button>
-                          <button
-                            onClick={() => updateWorkerStatus(item.worker.id, "late")}
-                            className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all ${
-                              item.status === "late"
-                                ? "bg-amber-600 text-white shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Atrasado
-                          </button>
-                          <button
-                            onClick={() => updateWorkerStatus(item.worker.id, "half_day")}
-                            className={`px-2.5 py-1 text-[10px] font-semibold rounded-md transition-all ${
-                              item.status === "half_day"
-                                ? "bg-sky-600 text-white shadow-xs"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            Meio Dia
-                          </button>
-                        </div>
-
-                        {/* Botão de Relógio (Registar Horas) */}
-                        <button
-                          onClick={() => toggleWorkerHours(item.worker.id)}
-                          className={`p-1.5 rounded-md border transition-all ${
-                            item.showHours
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : isAbsentStatus
-                              ? "opacity-40 cursor-not-allowed bg-muted text-muted-foreground"
-                              : "bg-background text-muted-foreground hover:text-foreground border-border"
-                          }`}
-                          title="Registar horas para este trabalhador"
-                          type="button"
-                        >
-                          <Clock className="h-3.5 w-3.5" />
-                        </button>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Obra *</Label>
+                <Select value={projectId} onValueChange={setProjectId}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Selecione a obra..." />
+                  </SelectTrigger>
+                  <SelectContent className="text-xs max-h-56">
+                    <div className="p-1.5 border-b">
+                      <div className="relative">
+                        <Search className="h-3 w-3 absolute left-2 top-2 text-muted-foreground" />
+                        <Input
+                          placeholder="Filtrar obra..."
+                          value={projectSearch}
+                          onChange={(e) => setProjectSearch(e.target.value)}
+                          className="h-7 pl-7 text-[11px]"
+                        />
                       </div>
                     </div>
+                    {filteredObras.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </DialogHeader>
 
-                    {/* Sub-painel Inline de Horas */}
-                    {item.showHours && !isAbsentStatus && (
-                      <div className="bg-muted/30 p-2.5 rounded-lg border border-dashed grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-                        <div className="flex flex-col gap-0.5">
-                          <label className="text-[9px] font-bold text-muted-foreground">Entrada</label>
-                          <Input
-                            type="time"
-                            value={item.checkInTime}
-                            onChange={(e) => updateWorkerHours(item.worker.id, "checkInTime", e.target.value)}
-                            className="h-7 text-[10px] bg-background"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <label className="text-[9px] font-bold text-muted-foreground">Saída</label>
-                          <Input
-                            type="time"
-                            value={item.checkOutTime}
-                            onChange={(e) => updateWorkerHours(item.worker.id, "checkOutTime", e.target.value)}
-                            className="h-7 text-[10px] bg-background"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <label className="text-[9px] font-bold text-muted-foreground">Pausa (min)</label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={item.breakMinutes}
-                            onChange={(e) => updateWorkerHours(item.worker.id, "breakMinutes", Math.max(0, parseInt(e.target.value, 10) || 0))}
-                            className="h-7 text-[10px] bg-background"
-                          />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                          <label className="text-[9px] font-bold text-muted-foreground">Extra (min)</label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={item.overtimeMinutes}
-                            onChange={(e) => updateWorkerHours(item.worker.id, "overtimeMinutes", Math.max(0, parseInt(e.target.value, 10) || 0))}
-                            className="h-7 text-[10px] bg-background"
-                          />
-                        </div>
-
-                        {/* Linha Resumo do Trabalhador */}
-                        {item.checkInTime && item.checkOutTime && (
-                          <div className="sm:col-span-4 bg-background/60 p-1.5 rounded text-[10px] flex justify-between font-medium">
-                            <span>Horas Normais: <span className="text-foreground font-bold">{formatMins(calculated)}</span></span>
-                            {item.overtimeMinutes > 0 && (
-                              <span>Horas Extra: <span className="text-amber-600 font-bold">{formatMins(item.overtimeMinutes)}</span></span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Nota do Trabalhador */}
-                    <div className="relative">
-                      <FileText className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground/60" />
-                      <Input
-                        placeholder="Adicionar nota para este trabalhador..."
-                        value={item.notes}
-                        onChange={(e) => updateWorkerNotes(item.worker.id, e.target.value)}
-                        className="pl-8 text-[10px] h-7 bg-muted/20 border-0"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          {/* Banner de Dia Desativado (Se Existir) */}
+          {currentDisabledRecord && (
+            <div className="bg-amber-500/15 border-b border-amber-500/30 p-3 px-5 flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-300">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Aviso:</strong> Este dia foi marcado como sem trabalho por motivo de{" "}
+                  <strong>"{currentDisabledRecord.reason}"</strong>.
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleReenableDay}
+                className="h-7 text-[11px] bg-background border-amber-500/40 text-amber-900 dark:text-amber-200"
+              >
+                <RotateCcw className="h-3 w-3 mr-1" /> Reativar Dia
+              </Button>
             </div>
           )}
-        </div>
 
-        <DialogFooter className="px-5 py-4 border-t gap-2 bg-muted/10">
-          <Button variant="outline" onClick={() => handleOpenChange(false)} className="text-xs h-9">
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!projectId || !date || workersList.length === 0 || isSaving}
-            className="bg-primary hover:bg-primary-dark text-white text-xs h-9 px-4"
-          >
-            {isSaving ? "A guardar chamada..." : "Guardar Chamada"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Toolbar de Ações Rápidas Globais e Pesquisa */}
+          {projectId && date && (
+            <div className="p-3 bg-muted/30 border-b space-y-2 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {/* Botões de Marcação Global */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleMarkAllPresent}
+                    className="h-7 text-[11px] gap-1 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                  >
+                    <Check className="h-3 w-3" /> Todos Presentes
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleMarkAllAbsent}
+                    className="h-7 text-[11px] gap-1 border-rose-500/30 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10"
+                  >
+                    <X className="h-3 w-3" /> Todos Ausentes
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleClearAll}
+                    className="h-7 text-[11px] text-muted-foreground"
+                  >
+                    Limpar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCopyYesterday}
+                    className="h-7 text-[11px] gap-1 border-border/80"
+                  >
+                    <Copy className="h-3 w-3" /> Copiar Ontem
+                  </Button>
+                </div>
+
+                {/* Adicionar Trabalhador Extra & Desativar Dia */}
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setExtraWorkerDialogOpen(true)}
+                    className="h-7 text-[11px] gap-1"
+                  >
+                    <UserPlus className="h-3.5 w-3.5 text-primary" /> Adicionar Trabalhador
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDisableDayDialogOpen(true)}
+                    className="h-7 text-[11px] gap-1 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                  >
+                    <Ban className="h-3.5 w-3.5" /> Desativar Dia
+                  </Button>
+                </div>
+              </div>
+
+              {/* Pesquisa Instantânea */}
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 absolute left-2.5 top-2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Pesquisar por nome do trabalhador ou equipa..."
+                  value={workerSearch}
+                  onChange={(e) => setWorkerSearch(e.target.value)}
+                  className="h-7 pl-8 text-xs bg-background"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Conteúdo Principal (Lista por Equipas) */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {!projectId || !date ? (
+              <div className="p-8 text-center text-muted-foreground space-y-2 border border-dashed rounded-xl">
+                <Calendar className="h-8 w-8 mx-auto opacity-40 text-primary" />
+                <p className="text-xs">Selecione uma obra e uma data para iniciar a chamada diária.</p>
+              </div>
+            ) : filteredWorkersList.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground space-y-3 border border-dashed rounded-xl">
+                <Users className="h-8 w-8 mx-auto opacity-40" />
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold">Nenhum trabalhador agendado para esta data.</p>
+                  <p className="text-[11px]">
+                    Nenhum trabalhador tem escala ativa nesta obra para {date}. Pode clicar em "Adicionar Trabalhador" para incluir apoios pontuais.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setExtraWorkerDialogOpen(true)}
+                  className="text-xs"
+                >
+                  <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Adicionar Trabalhador
+                </Button>
+              </div>
+            ) : (
+              Array.from(groupedTeamsMap.entries()).map(([groupName, groupWorkers]) => {
+                const isCollapsed = !!collapsedTeams[groupName];
+
+                return (
+                  <div key={groupName} className="border rounded-xl bg-card overflow-hidden">
+                    {/* Cabeçalho do Grupo de Equipa */}
+                    <div className="p-3 bg-muted/40 border-b flex flex-wrap items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleTeamCollapse(groupName)}
+                        className="flex items-center gap-2 font-bold text-xs text-foreground hover:opacity-80 transition-opacity"
+                      >
+                        {isCollapsed ? (
+                          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span>{groupName}</span>
+                        <Badge variant="secondary" className="text-[10px] ml-1">
+                          {groupWorkers.length}
+                        </Badge>
+                      </button>
+
+                      {/* Ações por Equipa */}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => handleMarkTeamStatus(groupName, "present")}
+                          className="h-6 text-[10px] text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 px-2"
+                        >
+                          ✓ Todos Presentes
+                        </Button>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => handleMarkTeamStatus(groupName, "absent")}
+                          className="h-6 text-[10px] text-rose-700 dark:text-rose-400 hover:bg-rose-500/10 px-2"
+                        >
+                          ✕ Todos Ausentes
+                        </Button>
+                        <Button
+                          type="button"
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => handleClearTeamStatus(groupName)}
+                          className="h-6 text-[10px] text-muted-foreground px-1.5"
+                        >
+                          Limpar
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Lista de Operários da Equipa */}
+                    {!isCollapsed && (
+                      <div className="divide-y">
+                        {groupWorkers.map((item) => {
+                          const allowsHours = item.status === "present" || item.status === "late" || item.status === "half_day";
+
+                          return (
+                            <div
+                              key={item.worker.id}
+                              className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/10 transition-colors"
+                            >
+                              {/* Dados do Trabalhador */}
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <Avatar className="h-8 w-8 border shrink-0">
+                                  {item.worker.photo ? (
+                                    <img src={item.worker.photo} alt={item.worker.name} className="object-cover" />
+                                  ) : (
+                                    <AvatarFallback className="text-[10px] font-bold">
+                                      {initials(item.worker.name)}
+                                    </AvatarFallback>
+                                  )}
+                                </Avatar>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-xs text-foreground flex items-center gap-1.5">
+                                    <span className="truncate">{item.worker.name}</span>
+                                    {item.isExtra && (
+                                      <Badge variant="secondary" className="text-[9px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                        Extra: {item.extraReason}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground truncate">
+                                    {item.worker.role}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Seletor de Estado */}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={item.status === "present" ? "default" : "outline"}
+                                  onClick={() => handleStatusChange(item.worker.id, "present")}
+                                  className={`h-7 text-[11px] px-2.5 ${
+                                    item.status === "present"
+                                      ? "bg-emerald-600 hover:bg-emerald-700 text-white border-0 font-bold"
+                                      : "border-border/80"
+                                  }`}
+                                >
+                                  Presente
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={item.status === "absent" ? "default" : "outline"}
+                                  onClick={() => handleStatusChange(item.worker.id, "absent")}
+                                  className={`h-7 text-[11px] px-2.5 ${
+                                    item.status === "absent"
+                                      ? "bg-rose-600 hover:bg-rose-700 text-white border-0 font-bold"
+                                      : "border-border/80"
+                                  }`}
+                                >
+                                  Ausente
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={item.status === "late" ? "default" : "outline"}
+                                  onClick={() => handleStatusChange(item.worker.id, "late")}
+                                  className={`h-7 text-[11px] px-2.5 ${
+                                    item.status === "late"
+                                      ? "bg-amber-600 hover:bg-amber-700 text-white border-0 font-bold"
+                                      : "border-border/80"
+                                  }`}
+                                >
+                                  Atrasado
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={item.status === "half_day" ? "default" : "outline"}
+                                  onClick={() => handleStatusChange(item.worker.id, "half_day")}
+                                  className={`h-7 text-[11px] px-2 ${
+                                    item.status === "half_day"
+                                      ? "bg-sky-600 hover:bg-sky-700 text-white border-0 font-bold"
+                                      : "border-border/80"
+                                  }`}
+                                >
+                                  Meio dia
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={item.status === "justified_absence" ? "default" : "outline"}
+                                  onClick={() => handleStatusChange(item.worker.id, "justified_absence")}
+                                  className={`h-7 text-[11px] px-2 ${
+                                    item.status === "justified_absence"
+                                      ? "bg-purple-600 hover:bg-purple-700 text-white border-0 font-bold"
+                                      : "border-border/80"
+                                  }`}
+                                >
+                                  Licença
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Rodapé Fixo no Mobile e Desktop */}
+          <DialogFooter className="p-4 border-t bg-background shrink-0 flex items-center justify-between gap-3 sticky bottom-0 z-10 shadow-lg">
+            <div className="text-xs text-muted-foreground hidden sm:block">
+              {hasChanges ? (
+                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                  • Existem alterações pendentes por guardar.
+                </span>
+              ) : (
+                "Pronto para registar."
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenChange(false)}
+                className="text-xs h-9"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isSaving || !projectId || !date}
+                onClick={handleSave}
+                className="text-xs h-9 bg-primary hover:bg-primary-dark text-white font-bold flex-1 sm:flex-initial"
+              >
+                {isSaving ? "A guardar chamada..." : "Guardar Chamada"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Adicionar Trabalhador Extraordinário */}
+      <AttendanceExtraWorkerDialog
+        open={extraWorkerDialogOpen}
+        onOpenChange={setExtraWorkerDialogOpen}
+        existingWorkerIds={workersList.map((item) => item.worker.id)}
+        onAddExtraWorker={handleAddExtraWorker}
+      />
+
+      {/* Modal de Desativar Dia */}
+      <AttendanceDisableDayDialog
+        open={disableDayDialogOpen}
+        onOpenChange={setDisableDayDialogOpen}
+        projectId={projectId}
+        date={date}
+        onDayDisabledConfirmed={() => {}}
+      />
+    </>
   );
 }

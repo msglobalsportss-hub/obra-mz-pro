@@ -1,181 +1,296 @@
+/**
+ * Módulo Relatórios: Relatorios
+ * Rota: /app/relatorios
+ *
+ * Análise transversal organizada pela forma como o gerente pensa:
+ * - Obras
+ * - Materiais
+ * - Compras
+ * - Equipas
+ * - Financeiro
+ */
+
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
-import { Card } from "@/components/ui/card";
+import { PageContainer } from "@/components/shared/page-container";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { StatCard } from "@/components/stat-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { totalOrcamento, estadoObraLabel, type EstadoObra } from "@/lib/mock-data";
 import { formatMZN } from "@/lib/format";
-import { Download, TrendingUp, Wallet, TrendingDown, Users } from "lucide-react";
 import {
-  BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend,
+  Download,
+  HardHat,
+  Package,
+  ShoppingCart,
+  Users,
+  Wallet,
+  TrendingUp,
+  BarChart3,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
 import { useMemo, useState } from "react";
 import { useObraMZStore, totalsPorCliente } from "@/store/obramz-store";
+import { inventoryStoreManager } from "@/modules/inventory/store/inventory-store";
+import { DEFAULT_INITIAL_WAREHOUSES } from "@/lib/materials/warehouse";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/relatorios/")({ component: Relatorios });
 
 function Relatorios() {
-  const clientes = useObraMZStore((s) => s.clientes);
-  const obras = useObraMZStore((s) => s.obras);
-  const orcamentos = useObraMZStore((s) => s.orcamentos);
-  const pagamentos = useObraMZStore((s) => s.pagamentos);
+  const clientes = useObraMZStore((s) => s.clientes || []);
+  const obras = useObraMZStore((s) => s.obras || []);
+  const orcamentos = useObraMZStore((s) => s.orcamentos || []);
+  const pagamentos = useObraMZStore((s) => s.pagamentos || []);
+  const materials = useObraMZStore((s) => s.materials || []);
+  const purchaseOrders = useObraMZStore((s) => s.purchaseOrders || []);
+  const suppliers = useObraMZStore((s) => s.suppliers || []);
+  const workers = useObraMZStore((s) => s.workers || []);
+  const warehouses = useObraMZStore((s) => s.warehouses || DEFAULT_INITIAL_WAREHOUSES);
 
+  const [activeTab, setActiveTab] = useState("obras");
   const [de, setDe] = useState("2026-01-01");
   const [ate, setAte] = useState(new Date().toISOString().slice(0, 10));
-  const [clienteFiltro, setClienteFiltro] = useState<string>("all");
 
   const inRange = (iso: string) => iso >= de && iso <= ate;
 
-  const orcFiltrados = orcamentos.filter((o) => inRange(o.emissao) && (clienteFiltro === "all" || o.clienteId === clienteFiltro));
-  const pagFiltrados = pagamentos.filter((p) => inRange(p.data) && p.estado === "confirmado" && (clienteFiltro === "all" || p.clienteId === clienteFiltro));
+  const orcFiltrados = orcamentos.filter((o) => inRange(o.emissao));
+  const pagFiltrados = pagamentos.filter((p) => inRange(p.data) && p.estado === "confirmado");
 
   const totalOrc = orcFiltrados.reduce((s, o) => s + totalOrcamento(o).total, 0);
   const totalPag = pagFiltrados.reduce((s, p) => s + p.valor, 0);
-  const pendente = Math.max(0, totalOrc - totalPag);
 
-  const chartMensal = useMemo(() => {
-    const start = new Date(de);
-    const end = new Date(ate);
-    const months: { key: string; label: string }[] = [];
-    const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-    while (cur <= end) {
-      months.push({
-        key: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
-        label: cur.toLocaleDateString("pt-PT", { month: "short", year: "2-digit" }),
-      });
-      cur.setMonth(cur.getMonth() + 1);
-    }
-    return months.map((m) => ({
-      mes: m.label,
-      orcado: orcFiltrados.filter((o) => o.emissao.startsWith(m.key)).reduce((s, o) => s + totalOrcamento(o).total, 0),
-      recebido: pagFiltrados.filter((p) => p.data.startsWith(m.key)).reduce((s, p) => s + p.valor, 0),
-    }));
-  }, [de, ate, orcFiltrados, pagFiltrados]);
-
-  const clientesTop = useMemo(() => {
-    const rank = clientes.map((c) => ({ c, t: totalsPorCliente(c.id) }));
-    return rank.sort((a, b) => b.t.recebido - a.t.recebido).slice(0, 5);
-  }, [clientes]);
-
-  const obrasPorEstado = (Object.keys(estadoObraLabel) as EstadoObra[]).map((e) => ({
-    estado: estadoObraLabel[e],
-    total: obras.filter((o) => o.estado === e).length,
-  }));
+  // Mapeamento de Inventário
+  const inventoryBalances = Object.values(inventoryStoreManager.getState().balances);
+  const totalInventoryValue = inventoryBalances.reduce((s, b) => s + b.totalValue, 0);
 
   const exportCsv = () => {
     const rows = [
-      ["Tipo", "Data", "Cliente/Obra", "Referência/Nº", "Valor"],
-      ...orcFiltrados.map((o) => ["Orçamento", o.emissao, clientes.find((c) => c.id === o.clienteId)?.nome ?? "", o.numero, String(totalOrcamento(o).total)]),
-      ...pagFiltrados.map((p) => ["Pagamento", p.data, clientes.find((c) => c.id === p.clienteId)?.nome ?? "", p.referencia, String(p.valor)]),
+      ["Tipo", "Data", "Descrição / Referência", "Valor"],
+      ...orcFiltrados.map((o) => [
+        "Orçamento",
+        o.emissao,
+        o.numero,
+        String(totalOrcamento(o).total),
+      ]),
+      ...pagFiltrados.map((p) => ["Pagamento", p.data, p.referencia, String(p.valor)]),
     ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = rows
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `relatorio-obramz-${de}-${ate}.csv`;
+    a.download = `relatorio-${activeTab}-obramz-${de}-${ate}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Relatório exportado (CSV)");
+    toast.success("Relatório exportado em formato CSV!");
   };
 
-  const maxRec = clientesTop[0]?.t.recebido || 1;
-
   return (
-    <div>
+    <PageContainer>
       <PageHeader
-        title="Relatórios"
-        description="Análise financeira e operacional da sua empresa."
-        actions={<Button variant="outline" onClick={exportCsv}><Download className="mr-1 h-4 w-4" />Exportar CSV</Button>}
+        title="Relatórios Operacionais & Financeiros"
+        description="Indicadores transversais de gestão organizados por domínio de negócio"
+        breadcrumbs={[{ label: "Início", href: "/app" }, { label: "Relatórios" }]}
+        actions={
+          <Button variant="outline" size="sm" onClick={exportCsv} className="gap-1.5 text-xs">
+            <Download className="w-4 h-4" />
+            <span>Exportar CSV</span>
+          </Button>
+        }
       />
 
-      <Card className="mb-6 p-4">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1"><Label className="text-xs">De</Label><Input type="date" value={de} onChange={(e) => setDe(e.target.value)} /></div>
-          <div className="space-y-1"><Label className="text-xs">Até</Label><Input type="date" value={ate} onChange={(e) => setAte(e.target.value)} /></div>
+      {/* Filtro por Período */}
+      <Card className="mb-4 p-3 border-border/60">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
           <div className="space-y-1">
-            <Label className="text-xs">Cliente</Label>
-            <Select value={clienteFiltro} onValueChange={setClienteFiltro}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Label className="text-xs">Data de Início</Label>
+            <Input
+              type="date"
+              value={de}
+              onChange={(e) => setDe(e.target.value)}
+              className="h-9 text-xs"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Data de Fim</Label>
+            <Input
+              type="date"
+              value={ate}
+              onChange={(e) => setAte(e.target.value)}
+              className="h-9 text-xs"
+            />
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total orçamentos" value={formatMZN(totalOrc)} icon={TrendingUp} tone="primary" />
-        <StatCard label="Recebimentos" value={formatMZN(totalPag)} icon={Wallet} tone="success" />
-        <StatCard label="Valores pendentes" value={formatMZN(pendente)} icon={TrendingDown} tone="warning" />
-        <StatCard label="Clientes" value={clientes.length} icon={Users} />
-      </div>
+      {/* Tabs por Lógica do Gerente */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-muted/60 p-1">
+          <TabsTrigger value="obras" className="gap-2 text-xs">
+            <HardHat className="w-3.5 h-3.5" />
+            <span>Obras</span>
+          </TabsTrigger>
+          <TabsTrigger value="materiais" className="gap-2 text-xs">
+            <Package className="w-3.5 h-3.5" />
+            <span>Materiais</span>
+          </TabsTrigger>
+          <TabsTrigger value="compras" className="gap-2 text-xs">
+            <ShoppingCart className="w-3.5 h-3.5" />
+            <span>Compras</span>
+          </TabsTrigger>
+          <TabsTrigger value="equipas" className="gap-2 text-xs">
+            <Users className="w-3.5 h-3.5" />
+            <span>Equipas</span>
+          </TabsTrigger>
+          <TabsTrigger value="financeiro" className="gap-2 text-xs">
+            <Wallet className="w-3.5 h-3.5" />
+            <span>Financeiro</span>
+          </TabsTrigger>
+        </TabsList>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <div className="mb-3 text-sm font-semibold">Desempenho mensal</div>
-          <div className="h-72">
-            <ResponsiveContainer>
-              <LineChart data={chartMensal}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="mes" fontSize={12} />
-                <YAxis fontSize={12} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => formatMZN(v)} />
-                <Legend />
-                <Line type="monotone" dataKey="orcado" stroke="hsl(var(--primary))" strokeWidth={2.5} name="Orçado" />
-                <Line type="monotone" dataKey="recebido" stroke="hsl(var(--success))" strokeWidth={2.5} name="Recebido" />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* 1. OBRAS */}
+        <TabsContent value="obras" className="mt-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">Obras em Andamento</div>
+              <div className="text-2xl font-bold mt-1 text-blue-600">
+                {obras.filter((o) => o.estado === "em_andamento").length}
+              </div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">Obras Concluídas</div>
+              <div className="text-2xl font-bold mt-1 text-emerald-600">
+                {obras.filter((o) => o.estado === "concluida").length}
+              </div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Valor Total Orçado em Obras
+              </div>
+              <div className="text-2xl font-bold mt-1">
+                {formatMZN(obras.reduce((s, o) => s + (o.valorPrevisto || 0), 0))}
+              </div>
+            </Card>
           </div>
-        </Card>
+        </TabsContent>
 
-        <Card className="p-5">
-          <div className="mb-3 text-sm font-semibold">Obras por estado</div>
-          <div className="h-72">
-            <ResponsiveContainer>
-              <BarChart data={obrasPorEstado}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="estado" fontSize={11} />
-                <YAxis fontSize={12} allowDecimals={false} />
-                <Tooltip />
-                <Bar dataKey="total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+        {/* 2. MATERIAIS */}
+        <TabsContent value="materiais" className="mt-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Valor Total em Inventário (WAC)
+              </div>
+              <div className="text-2xl font-bold mt-1 text-emerald-600">
+                {formatMZN(totalInventoryValue)}
+              </div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Total de Armazéns Ativos
+              </div>
+              <div className="text-2xl font-bold mt-1">
+                {warehouses.filter((w) => w.isActive).length}
+              </div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">SKUs Cadastrados</div>
+              <div className="text-2xl font-bold mt-1">{materials.length}</div>
+            </Card>
           </div>
-        </Card>
+        </TabsContent>
 
-        <Card className="p-5 lg:col-span-2">
-          <div className="mb-3 text-sm font-semibold">Clientes com maior volume recebido</div>
-          {clientesTop.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">Sem dados.</div>
-          ) : (
-            <div className="divide-y">
-              {clientesTop.map(({ c, t }, i) => (
-                <div key={c.id} className="flex items-center gap-3 py-3">
-                  <div className="grid h-8 w-8 place-items-center rounded-full bg-primary-soft text-xs font-bold text-primary-dark">{i + 1}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">{c.nome}</div>
-                    <div className="text-xs text-muted-foreground">{[c.cidade, c.provincia].filter(Boolean).join(", ")}</div>
-                  </div>
-                  <div className="w-40">
-                    <div className="h-2 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, (t.recebido / maxRec) * 100)}%` }} />
-                    </div>
-                  </div>
-                  <div className="w-32 text-right font-semibold">{formatMZN(t.recebido)}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-    </div>
+        {/* 3. COMPRAS */}
+        <TabsContent value="compras" className="mt-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Pedidos de Compra Criados
+              </div>
+              <div className="text-2xl font-bold mt-1">{purchaseOrders.length}</div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Fornecedores Registados
+              </div>
+              <div className="text-2xl font-bold mt-1">{suppliers.length}</div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Volume Total de Compras
+              </div>
+              <div className="text-2xl font-bold mt-1">
+                {formatMZN(purchaseOrders.reduce((s, p) => s + (p.totalAmount || 0), 0))}
+              </div>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* 4. EQUIPAS */}
+        <TabsContent value="equipas" className="mt-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Trabalhadores Registados
+              </div>
+              <div className="text-2xl font-bold mt-1">{workers.length}</div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">Trabalhadores Ativos</div>
+              <div className="text-2xl font-bold mt-1 text-emerald-600">
+                {workers.filter((w) => w.status === "active").length}
+              </div>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* 5. FINANCEIRO */}
+        <TabsContent value="financeiro" className="mt-2 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">Total Orçado</div>
+              <div className="text-2xl font-bold mt-1">{formatMZN(totalOrc)}</div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Total Recebido (Caixa)
+              </div>
+              <div className="text-2xl font-bold mt-1 text-emerald-600">{formatMZN(totalPag)}</div>
+            </Card>
+            <Card className="p-4 border-border/60">
+              <div className="text-xs text-muted-foreground font-medium">
+                Pendente de Recebimento
+              </div>
+              <div className="text-2xl font-bold mt-1 text-amber-600">
+                {formatMZN(Math.max(0, totalOrc - totalPag))}
+              </div>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </PageContainer>
   );
 }

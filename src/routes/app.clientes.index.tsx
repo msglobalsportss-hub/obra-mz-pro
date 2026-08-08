@@ -18,6 +18,8 @@ import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { EmptyState } from "@/components/common/empty-state";
 
+import { PageContainer } from "@/components/shared/page-container";
+
 export const Route = createFileRoute("/app/clientes/")({ component: ClientesPage });
 
 function ClientesPage() {
@@ -45,12 +47,13 @@ function ClientesPage() {
   const openEdit = (c: Cliente) => { setEditing(c); setFormOpen(true); };
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
         title="Clientes"
-        description="Gerir os clientes da sua empreiteira."
+        description="Gestão da carteira de clientes, contactos e histórico financeiro."
+        breadcrumbs={[{ label: "Clientes" }]}
         actions={
-          <Button className="bg-primary hover:bg-primary-dark" onClick={openNew}>
+          <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm text-xs font-semibold" onClick={openNew}>
             <Plus className="mr-1 h-4 w-4" />Novo cliente
           </Button>
         }
@@ -184,7 +187,7 @@ function ClientesPage() {
           }
         }}
       />
-    </div>
+    </PageContainer>
   );
 }
 

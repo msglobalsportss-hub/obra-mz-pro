@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
+import { PageContainer } from "@/components/shared/page-container";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -347,10 +348,11 @@ function EquipasPage() {
   };
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
         title="Equipas e Trabalhadores"
-        description="Gira as equipas de trabalho, as fichas de pessoal e alocações de obras."
+        description="Gestão da força de trabalho, equipas de especialidade e alocações operacionais em obras."
+        breadcrumbs={[{ label: "Equipas & Trabalhadores" }]}
       />
 
       <Tabs defaultValue="trabalhadores" className="space-y-4">
@@ -1355,6 +1357,6 @@ function EquipasPage() {
         tone="destructive"
         onConfirm={confirmCancelAssign}
       />
-    </div>
+    </PageContainer>
   );
 }

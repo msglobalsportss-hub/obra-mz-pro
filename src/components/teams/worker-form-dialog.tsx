@@ -83,6 +83,9 @@ export function WorkerFormDialog({
   const [hireDate, setHireDate] = useState("");
   const [paymentType, setPaymentType] = useState<Worker["paymentType"]>("daily");
   const [rate, setRate] = useState<string>("");
+  const [overtimeRate, setOvertimeRate] = useState<string>("");
+  const [currency, setCurrency] = useState<string>("MZN");
+  const [defaultHours, setDefaultHours] = useState<string>("8");
   const [notes, setNotes] = useState("");
 
   // Novos campos da Sprint 2
@@ -103,13 +106,16 @@ export function WorkerFormDialog({
   useEffect(() => {
     if (open) {
       if (workerToEdit) {
-        setName(workerToEdit.name);
+        setName(workerToEdit.name || "");
         setPhone(workerToEdit.phone || "");
-        setRole(workerToEdit.role);
+        setRole(workerToEdit.role || "");
         setPhoto(workerToEdit.photo || "");
-        setStatus(workerToEdit.status);
+        setStatus(workerToEdit.status || "active");
         setHireDate(workerToEdit.hireDate || "");
-        setPaymentType(workerToEdit.paymentType);
+        setPaymentType(workerToEdit.paymentType || "daily");
+        setOvertimeRate(workerToEdit.overtimeHourlyRate?.toString() || "");
+        setCurrency(workerToEdit.currency || "MZN");
+        setDefaultHours(workerToEdit.defaultWorkingHours?.toString() || "8");
         setNotes(workerToEdit.notes || "");
         
         // Novos campos
@@ -141,6 +147,9 @@ export function WorkerFormDialog({
         setHireDate("");
         setPaymentType("daily");
         setRate("");
+        setOvertimeRate("");
+        setCurrency("MZN");
+        setDefaultHours("8");
         setNotes("");
         
         // Novos campos
@@ -213,6 +222,18 @@ export function WorkerFormDialog({
       return;
     }
 
+    const numericOvertimeRate = overtimeRate ? parseFloat(overtimeRate) : undefined;
+    if (numericOvertimeRate !== undefined && (isNaN(numericOvertimeRate) || numericOvertimeRate < 0)) {
+      toast.error("O valor por hora extraordinária não pode ser negativo.");
+      return;
+    }
+
+    const numericDefaultHours = defaultHours ? parseFloat(defaultHours) : 8;
+    if (isNaN(numericDefaultHours) || numericDefaultHours <= 0 || numericDefaultHours > 24) {
+      toast.error("As horas normais por dia devem ser um número maior que 0 e até 24.");
+      return;
+    }
+
     const payload: Omit<Worker, "id" | "createdAt" | "updatedAt"> = {
       name: name.trim(),
       phone: phone.trim() || undefined,
@@ -224,6 +245,9 @@ export function WorkerFormDialog({
       dailyRate: paymentType === "daily" ? numericRate : undefined,
       hourlyRate: paymentType === "hourly" ? numericRate : undefined,
       monthlyRate: paymentType === "monthly" ? numericRate : undefined,
+      overtimeHourlyRate: numericOvertimeRate,
+      currency: currency.trim() || "MZN",
+      defaultWorkingHours: numericDefaultHours,
       notes: notes.trim() || undefined,
       
       // Novos campos
@@ -530,9 +554,9 @@ export function WorkerFormDialog({
 
               <div className="space-y-1">
                 <Label htmlFor="worker-rate">
-                  {paymentType === "daily" && "Taxa Diária (MZN) *"}
-                  {paymentType === "hourly" && "Valor por Hora (MZN) *"}
-                  {paymentType === "monthly" && "Salário Mensal (MZN) *"}
+                  {paymentType === "daily" && `Taxa Diária (${currency}) *`}
+                  {paymentType === "hourly" && `Valor por Hora Regular (${currency}) *`}
+                  {paymentType === "monthly" && `Salário Mensal (${currency}) *`}
                 </Label>
                 <Input
                   id="worker-rate"
@@ -543,6 +567,54 @@ export function WorkerFormDialog({
                   placeholder="Ex.: 1500"
                 />
               </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="worker-overtime-rate">
+                  Valor por Hora Extraordinária ({currency})
+                </Label>
+                <Input
+                  id="worker-overtime-rate"
+                  type="number"
+                  min={0}
+                  value={overtimeRate}
+                  onChange={(e) => setOvertimeRate(e.target.value)}
+                  placeholder={paymentType === "hourly" ? "Padrão: valor da hora regular" : "Ex.: 150"}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="worker-def-hours">Horas Normais por Dia *</Label>
+                <Input
+                  id="worker-def-hours"
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={defaultHours}
+                  onChange={(e) => setDefaultHours(e.target.value)}
+                  placeholder="8"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="worker-currency">Moeda *</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger id="worker-currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MZN">Metical (MZN)</SelectItem>
+                    <SelectItem value="USD">Dólar Americano (USD)</SelectItem>
+                    <SelectItem value="ZAR">Rand Sul-Africano (ZAR)</SelectItem>
+                    <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {paymentType === "monthly" && (
+                <div className="sm:col-span-2 p-2.5 rounded-lg border bg-blue-500/10 border-blue-500/20 text-[11px] text-blue-900 dark:text-blue-300">
+                  <strong>Nota:</strong> Para trabalhadores mensais, as presenças registam o total de horas trabalhadas diariamente. O custo por presença diária é computado como 0.00 MZN e o cálculo do vencimento global será processado na folha mensal.
+                </div>
+              )}
 
               {workerToEdit && (
                 <div className="space-y-1 sm:col-span-2">

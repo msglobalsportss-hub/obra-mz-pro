@@ -17,6 +17,8 @@ import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { EmptyState } from "@/components/common/empty-state";
 import { toast } from "sonner";
 
+import { PageContainer } from "@/components/shared/page-container";
+
 export const Route = createFileRoute("/app/obras/")({ component: ObrasPage });
 
 const toneFor = (e: EstadoObra) =>
@@ -48,12 +50,13 @@ function ObrasPage() {
   const openEdit = (o: Obra) => { setEditing(o); setFormOpen(true); };
 
   return (
-    <div>
+    <PageContainer>
       <PageHeader
         title="Obras"
-        description="Todas as obras da sua empreiteira."
+        description="Gestão de empreitadas, execução de trabalhos, prazos e custos por projeto."
+        breadcrumbs={[{ label: "Obras" }]}
         actions={
-          <Button className="bg-primary hover:bg-primary-dark" onClick={openNew}>
+          <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-sm text-xs font-semibold" onClick={openNew}>
             <Plus className="mr-1 h-4 w-4" />Nova obra
           </Button>
         }
@@ -178,7 +181,7 @@ function ObrasPage() {
           }
         }}
       />
-    </div>
+    </PageContainer>
   );
 }
 
