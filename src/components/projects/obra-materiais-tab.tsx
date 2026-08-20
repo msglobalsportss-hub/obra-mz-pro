@@ -26,6 +26,7 @@ import {
   useInventoryOperation,
 } from "@/modules/inventory";
 import { toTenantId, toCompanyId } from "@/modules/inventory/core/shared/primitives";
+import { useProjectCostStore } from "@/modules/project-costs";
 import { toast } from "sonner";
 
 interface ObraMateriaisTabProps {
@@ -128,7 +129,23 @@ export function ObraMateriaisTab({ obraId, obraNome, fases = [] }: ObraMateriais
 
     const res = await consumeOperation.execute();
     if (res && res.success) {
-      toast.success("Consumo registado com sucesso! Stock da obra atualizado.");
+      // Regista a entrada histórica no domínio ProjectMaterialCost
+      const targetBal = obraBalances.find((b) => b.materialId === selectedMaterialId);
+      const currentWac = targetBal?.averageCost || 0;
+      useProjectCostStore.getState().recordConsumption({
+        projectId: obraId,
+        materialId: selectedMaterialId,
+        quantity: qty,
+        unit: "un",
+        unitCostAtConsumption: currentWac,
+        phaseId: selectedPhaseId !== "ALL" ? selectedPhaseId : undefined,
+        movementId: res.movementIds?.[0] || `mov-cons-${Date.now()}`,
+        actorId: "USER-1",
+        sourceLocationId: targetBal?.locationId || obraId,
+        notes: notesInput,
+      });
+
+      toast.success("Consumo registado com sucesso! Custo da obra atualizado.");
       setQuantityInput("");
       setNotesInput("");
       setTimeout(() => setConsumeDialogOpen(false), 1200);

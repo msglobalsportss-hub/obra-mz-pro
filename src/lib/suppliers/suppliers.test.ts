@@ -257,3 +257,12 @@ export function runSuppliersTests() {
   console.log("=== TODOS OS TESTES DA ETAPA 6.2 (INCLUINDO MELHOR PREÇO) PASSARAM COM SUCESSO! ===");
   return true;
 }
+
+if (typeof describe !== "undefined") {
+  describe("Suppliers Validation", () => {
+    it("runs all suppliers tests", () => {
+      expect(runSuppliersTests()).toBe(true);
+    });
+  });
+}
+

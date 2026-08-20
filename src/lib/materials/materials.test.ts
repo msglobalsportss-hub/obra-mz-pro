@@ -138,3 +138,12 @@ export function runMaterialsTests() {
   console.log("=== TODOS OS TESTES DA ETAPA 6.1 (INCLUINDO CENÁRIOS A, B e C) PASSARAM COM SUCESSO! ===");
   return true;
 }
+
+if (typeof describe !== "undefined") {
+  describe("Materials Validation", () => {
+    it("runs all materials tests", () => {
+      expect(runMaterialsTests()).toBe(true);
+    });
+  });
+}
+

@@ -1,4 +1,5 @@
-import type { Material, Warehouse, Obra } from "@/lib/mock-data";
+import type { Material, Obra } from "@/lib/mock-data";
+import type { Warehouse } from "@/lib/materials/warehouse";
 import type { Supplier } from "@/lib/suppliers";
 import type { PurchaseOrder, Delivery } from "@/lib/purchases";
 
@@ -8,7 +9,7 @@ export function getMaterialDisplay(materialId: string, materials: Material[] = [
     return {
       name: mat.name,
       sku: mat.sku || mat.id,
-      unit: mat.unit || "un",
+      unit: (mat as any).unit || (mat as any).unidade || "un",
     };
   }
   // Fallback humanizado
@@ -41,10 +42,9 @@ export function getLocationDisplay(
   }
 
   // Verificar se é obra
-  const cleanProjId = locationId.replace(/^LOC-PROJ-/, "").replace(/^PROJ-/, "");
-  const obra = obras.find((o) => o.id === cleanProjId || o.id === locationId);
+  const obra = obras.find((o) => o.id === locationId || (o as any).code === locationId || `PROJ-${o.id}` === locationId);
   if (obra) {
-    return { label: `Obra: ${obra.nome}`, type: "project", code: obra.codigo || obra.id };
+    return { label: `Obra: ${obra.nome}`, type: "project", code: (obra as any).code || obra.id };
   }
 
   // Mapeamentos comuns fallback

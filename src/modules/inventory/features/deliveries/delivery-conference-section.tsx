@@ -69,8 +69,8 @@ export function DeliveryConferenceSection({
   onOpenSummary,
   onClose,
 }: DeliveryConferenceSectionProps) {
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
   const materials = useObraMZStore((s) => s.materials || []);
   const warehouses = useObraMZStore((s) => s.warehouses || []);
   const obras = useObraMZStore((s) => s.obras || []);
@@ -147,31 +147,12 @@ export function DeliveryConferenceSection({
       const timestamp = new Date().toISOString();
       const idempotencyBase = `batch-${delivery.id}-${batchIndex}`;
 
+      const itemsToReceive: { item: DeliveryItem; acceptedQty: number; deliveredQty: number; rejectedQty: number }[] = [];
+
       for (const item of deliveryItems) {
         const acceptedQty = getAccepted(item.id, item);
         const deliveredQty = getDelivered(item.id, item);
         const rejectedQty = Math.max(0, deliveredQty - acceptedQty);
-
-        if (acceptedQty > 0) {
-          const idempotencyKey = `${idempotencyBase}-${item.id}`;
-          try {
-            const res = await inventoryActions.receiveStock({
-              tenantId: toTenantId(activeTenantId),
-              companyId: toCompanyId(activeCompanyId),
-              correlationId: delivery.id,
-              idempotencyKey,
-              timestamp,
-              sourceModule: "delivery_conference_section",
-              materialId: item.materialId,
-              locationId: destLocationId,
-              quantity: acceptedQty,
-              unitCost: item.actualUnitCost || item.unitPrice || 0,
-            });
-            if (res?.movementIds) batchMovementIds.push(...res.movementIds);
-          } catch (err) {
-            console.warn(`[ConferenceSection] Erro ao registar movimento para item ${item.id}:`, err);
-          }
-        }
 
         batchItems.push({
           id: `bitem-${Date.now()}-${item.id}`,
@@ -185,6 +166,34 @@ export function DeliveryConferenceSection({
           unitPrice: item.actualUnitCost || item.unitPrice,
           notes: getObservation(item.id),
         });
+
+        if (acceptedQty > 0) {
+          itemsToReceive.push({ item, acceptedQty, deliveredQty, rejectedQty });
+        }
+      }
+
+      // Execução atómica no Engine (se algum falhar, o lote inteiro falha)
+      for (const { item, acceptedQty } of itemsToReceive) {
+        const idempotencyKey = `${idempotencyBase}-${item.id}`;
+        const res = await inventoryActions.receiveStock({
+          tenantId: toTenantId(activeTenantId),
+          companyId: toCompanyId(activeCompanyId),
+          correlationId: delivery.id,
+          idempotencyKey,
+          timestamp,
+          sourceModule: "delivery_conference_section",
+          materialId: item.materialId,
+          locationId: destLocationId,
+          quantity: acceptedQty,
+          unitCost: item.actualUnitCost || item.unitPrice || 0,
+        });
+
+        if (!res || (res.status !== "completed" && res.status !== "replayed")) {
+          throw new Error(`Falha ao processar entrada de stock para o item ${item.id}`);
+        }
+        if (res.movementIds) {
+          batchMovementIds.push(...res.movementIds);
+        }
       }
 
       const newBatch: ReceiptBatch = {

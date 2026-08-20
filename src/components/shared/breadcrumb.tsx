@@ -12,6 +12,7 @@ import {
 export interface BreadcrumbItem {
   label: string;
   to?: string;
+  href?: string;
   icon?: React.ReactNode;
 }
 
@@ -46,22 +47,26 @@ export function PageBreadcrumb({ items, className }: PageBreadcrumbProps) {
             </span>
           );
 
+          const targetUrl = item.to || item.href;
+
           return (
             <React.Fragment key={index}>
               {index > 0 && <ChevronRight className="w-3 h-3 text-slate-400 shrink-0" />}
 
-              {!isLast && item.to ? (
+              {!isLast && targetUrl ? (
                 isTruncated ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Link to={item.to} className="hover:text-blue-600 transition-colors">
+                      <Link to={targetUrl} className="hover:text-blue-600 transition-colors">
                         {content}
                       </Link>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">{item.label}</TooltipContent>
+                    <TooltipContent side="bottom" className="text-xs">
+                      {item.label}
+                    </TooltipContent>
                   </Tooltip>
                 ) : (
-                  <Link to={item.to} className="hover:text-blue-600 transition-colors">
+                  <Link to={targetUrl} className="hover:text-blue-600 transition-colors">
                     {content}
                   </Link>
                 )
@@ -70,7 +75,9 @@ export function PageBreadcrumb({ items, className }: PageBreadcrumbProps) {
                   <TooltipTrigger asChild>
                     <span>{content}</span>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">{item.label}</TooltipContent>
+                  <TooltipContent side="bottom" className="text-xs">
+                    {item.label}
+                  </TooltipContent>
                 </Tooltip>
               ) : (
                 content

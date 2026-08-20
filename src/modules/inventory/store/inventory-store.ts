@@ -153,6 +153,117 @@ class InventoryStoreManager {
       };
     });
   }
+
+  /**
+   * Sincronização atómica unidirecional a partir do UnitOfWork.
+   */
+  async syncFromUnitOfWork(uow: any): Promise<void> {
+    try {
+      const allBalances = await uow.balances.findAll();
+      const allMovements = await uow.movements.findAll();
+      const allReservations = await uow.reservations.findAll();
+      const allTransfers = await uow.transfers.findAll();
+
+      const balancesMap: Record<string, InventoryBalanceView> = {};
+      for (const b of allBalances) {
+        const key = `${b.materialId}:${b.locationId}:${b.stockState}`;
+        balancesMap[key] = {
+          id: b.id,
+          tenantId: b.tenantId,
+          companyId: b.companyId,
+          materialId: b.materialId,
+          locationId: b.locationId,
+          stockState: b.stockState,
+          batchId: b.batchId,
+          expirationDate: b.expirationDate,
+          onHandQuantity: b.onHandQuantity,
+          reservedQuantity: b.reservedQuantity,
+          availableQuantity: b.availableQuantity,
+          averageCost: b.averageCost,
+          totalValue: b.totalValue,
+          version: b.version,
+          updatedAt: b.updatedAt,
+        };
+      }
+
+      const movementsView = allMovements.map((m: any) => ({
+        id: m.id,
+        tenantId: m.tenantId,
+        companyId: m.companyId,
+        materialId: m.materialId,
+        movementType: m.movementType,
+        status: m.status,
+        sourceLocationId: m.sourceLocationId,
+        destinationLocationId: m.destinationLocationId,
+        quantity: m.quantity,
+        unitCost: m.unitCost,
+        totalCost: m.totalCost,
+        stockState: m.stockState,
+        batchId: m.batchId,
+        referenceType: m.referenceType,
+        referenceId: m.referenceId,
+        correlationId: m.correlationId,
+        occurredAt: m.occurredAt,
+      })).reverse();
+
+      const reservationsView = allReservations.map((r: any) => {
+        const remaining = r.quantity - (r.fulfilledQuantity + r.releasedQuantity);
+        return {
+          id: r.id,
+          tenantId: r.tenantId,
+          companyId: r.companyId,
+          materialId: r.materialId,
+          locationId: r.locationId,
+          quantity: r.quantity,
+          fulfilledQuantity: r.fulfilledQuantity,
+          releasedQuantity: r.releasedQuantity,
+          remainingQuantity: Math.max(0, remaining),
+          status: r.status,
+          requiredAt: r.requiredAt,
+          createdAt: r.createdAt,
+        };
+      });
+
+      const transfersView = allTransfers.map((t: any) => ({
+        id: t.id,
+        tenantId: t.tenantId,
+        companyId: t.companyId,
+        transferNumber: t.transferNumber,
+        sourceLocationId: t.sourceLocationId,
+        destinationLocationId: t.destinationLocationId,
+        status: t.status,
+        requestedAt: t.requestedAt,
+      }));
+
+      this.setState({
+        balances: balancesMap,
+        movements: movementsView,
+        reservations: reservationsView,
+        transfers: transfersView,
+        lastSyncAt: nowISO(),
+      });
+    } catch (err) {
+      console.error("[InventoryStoreManager] Erro ao sincronizar com UnitOfWork:", err);
+    }
+  }
+
+  async syncCompanyBalances(companyId: string, uow?: any): Promise<void> {
+    if (uow && typeof uow.syncFromStoreProjections === "function") {
+      await this.syncFromUnitOfWork(uow);
+    }
+  }
+
+  async syncCompanyMovements(companyId: string, uow?: any): Promise<void> {
+    if (uow && typeof uow.syncFromStoreProjections === "function") {
+      await this.syncFromUnitOfWork(uow);
+    }
+  }
+
+  async syncCompanyDeliveries(companyId: string, uow?: any): Promise<void> {
+    if (uow && typeof uow.syncFromStoreProjections === "function") {
+      await this.syncFromUnitOfWork(uow);
+    }
+  }
 }
 
 export const inventoryStoreManager = new InventoryStoreManager();

@@ -28,7 +28,7 @@ import { AttendanceScheduleFormDialog } from "@/components/teams/attendance-sche
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
-import type { AttendanceRecord, AttendanceStatus } from "@/lib/mock-data";
+import type { AttendanceRecord, AttendanceStatus, Worker, Obra, Team } from "@/lib/mock-data";
 import { formatAttendanceHours, formatMins } from "@/lib/time-utils";
 import { formatMZN } from "@/lib/format";
 import { calculateDailyLabourSummary } from "@/lib/attendance-labour-cost";
@@ -752,7 +752,7 @@ function PresencasPage() {
           <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
             <Button
               type="button"
-              size="xs"
+              size="sm"
               variant="outline"
               onClick={handleClearAllFilters}
               className="text-xs"
@@ -761,7 +761,7 @@ function PresencasPage() {
             </Button>
             <Button
               type="button"
-              size="xs"
+              size="sm"
               onClick={() => handlePeriodModeChange("month")}
               className="text-xs bg-primary text-white"
             >
@@ -790,7 +790,7 @@ function PresencasPage() {
                 {filteredRecords.map((r) => {
                   const worker = workerMap.get(r.workerId);
                   const obra = obraMap.get(r.projectId);
-                  const phase = obra?.fases?.find((f) => f.id === r.phaseId);
+                  const phase = (obra as any)?.fases?.find((f: any) => f.id === r.phaseId);
                   const team = r.teamId ? teamMap.get(r.teamId) : null;
 
                   return (
@@ -799,8 +799,8 @@ function PresencasPage() {
                       <TableCell>
                         <div className="flex items-center gap-2.5">
                           <Avatar className="h-7 w-7 border">
-                            {worker?.photo ? (
-                              <img src={worker.photo} alt={worker.name} className="object-cover" />
+                            {(worker as any)?.photo ? (
+                              <img src={(worker as any).photo} alt={worker?.name} className="object-cover" />
                             ) : (
                               <AvatarFallback className="text-[10px] font-bold">
                                 {worker ? initials(worker.name) : "?"}
@@ -809,12 +809,12 @@ function PresencasPage() {
                           </Avatar>
                           <div>
                             <div className="font-bold text-foreground">{worker?.name || "Desconhecido"}</div>
-                            <div className="text-[10px] text-muted-foreground">{worker?.role || "—"}</div>
+                            <div className="text-[10px] text-muted-foreground">{(worker as any)?.role || "—"}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium text-foreground">{obra?.nome || "—"}</div>
+                        <div className="font-medium text-foreground">{(obra as any)?.nome || "—"}</div>
                         <div className="text-[10px] text-muted-foreground">{phase?.nome || "Sem fase"}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -864,7 +864,7 @@ function PresencasPage() {
             {filteredRecords.map((r) => {
               const worker = workerMap.get(r.workerId);
               const obra = obraMap.get(r.projectId);
-              const phase = obra?.fases?.find((f) => f.id === r.phaseId);
+              const phase = (obra as any)?.fases?.find((f: any) => f.id === r.phaseId);
               const team = r.teamId ? teamMap.get(r.teamId) : null;
 
               return (
@@ -872,8 +872,8 @@ function PresencasPage() {
                   <div className="flex items-center justify-between border-b pb-2">
                     <div className="flex items-center gap-2">
                       <Avatar className="h-7 w-7 border">
-                        {worker?.photo ? (
-                          <img src={worker.photo} alt={worker.name} className="object-cover" />
+                        {(worker as any)?.photo ? (
+                          <img src={(worker as any).photo} alt={worker?.name} className="object-cover" />
                         ) : (
                           <AvatarFallback className="text-[10px] font-bold">
                             {worker ? initials(worker.name) : "?"}
@@ -882,7 +882,7 @@ function PresencasPage() {
                       </Avatar>
                       <div>
                         <div className="font-bold text-xs text-foreground">{worker?.name || "Desconhecido"}</div>
-                        <div className="text-[10px] text-muted-foreground">{worker?.role || "—"}</div>
+                        <div className="text-[10px] text-muted-foreground">{(worker as any)?.role || "—"}</div>
                       </div>
                     </div>
                     {getStatusBadge(r.status)}
@@ -890,7 +890,7 @@ function PresencasPage() {
 
                   <div className="grid grid-cols-2 gap-1.5 text-xs text-muted-foreground pt-1">
                     <div>Data: <strong className="text-foreground">{r.date}</strong></div>
-                    <div>Obra: <strong className="text-foreground">{obra?.nome || "—"}</strong></div>
+                    <div>Obra: <strong className="text-foreground">{(obra as any)?.nome || "—"}</strong></div>
                     <div>Fase: <strong className="text-foreground">{phase?.nome || "Sem fase"}</strong></div>
                     <div>Equipa: <strong className="text-foreground">{team?.name || "Individual"}</strong></div>
                     <div>Horário: <strong className="text-foreground">{r.checkInTime ? `${r.checkInTime}–${r.checkOutTime}` : "—"}</strong></div>
@@ -898,13 +898,13 @@ function PresencasPage() {
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-2 border-t mt-1">
-                    <Button size="xs" variant="outline" onClick={() => setSelectedDetails(r)} className="text-[10px] h-7">
+                    <Button size="sm" variant="outline" onClick={() => setSelectedDetails(r)} className="text-[10px] h-7">
                       <Eye className="h-3.5 w-3.5 mr-1" /> Ver
                     </Button>
-                    <Button size="xs" variant="outline" onClick={() => { setSelectedEdit(r); setFormOpen(true); }} className="text-[10px] h-7">
+                    <Button size="sm" variant="outline" onClick={() => { setSelectedEdit(r); setFormOpen(true); }} className="text-[10px] h-7">
                       <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                     </Button>
-                    <Button size="xs" variant="outline" onClick={() => setConfirmDel(r)} className="text-[10px] h-7 text-rose-600 hover:text-rose-700">
+                    <Button size="sm" variant="outline" onClick={() => setConfirmDel(r)} className="text-[10px] h-7 text-rose-600 hover:text-rose-700">
                       <Trash2 className="h-3.5 w-3.5 mr-1" /> Apagar
                     </Button>
                   </div>

@@ -27,8 +27,8 @@ export function HealthCheckView() {
   const permissions = useInventoryPermissions();
   const deliveries = useObraMZStore((s) => s.deliveries || []);
   const purchaseOrders = useObraMZStore((s) => s.purchaseOrders || []);
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
 
   // Estados
   const [diagnosticReport, setDiagnosticReport] = useState<MigrationRepairReport | null>(null);

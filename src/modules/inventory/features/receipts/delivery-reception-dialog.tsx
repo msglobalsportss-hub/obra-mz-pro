@@ -30,8 +30,8 @@ interface DeliveryReceptionDialogProps {
 }
 
 export function DeliveryReceptionDialog({ open, onOpenChange, delivery }: DeliveryReceptionDialogProps) {
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
 
   const materials = useObraMZStore((s) => s.materials || []);
   const warehouses = useObraMZStore((s) => s.warehouses || []);

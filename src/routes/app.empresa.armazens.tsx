@@ -42,6 +42,8 @@ import { Boxes, Plus, Star, Edit, Trash2, Power, ShieldAlert, CheckCircle2, Truc
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
+import { inventoryStoreManager } from "@/modules/inventory/store/inventory-store";
+
 export const Route = createFileRoute("/app/empresa/armazens")({
   component: ArmazensPage,
 });
@@ -54,6 +56,16 @@ function ArmazensPage() {
   const setMainWarehouse = useObraMZStore((s) => s.setMainWarehouse);
   const canDeleteWarehouse = useObraMZStore((s) => s.canDeleteWarehouse);
   const deleteWarehouse = useObraMZStore((s) => s.deleteWarehouse);
+
+  const [invState, setInvState] = React.useState(inventoryStoreManager.getState());
+  React.useEffect(() => {
+    return inventoryStoreManager.subscribe(setInvState);
+  }, []);
+
+  const balancesList = Object.values(invState.balances);
+  const criticalCount = balancesList.filter((b) => b.onHandQuantity <= 0).length;
+  const lowStockCount = balancesList.filter((b) => b.onHandQuantity > 0 && b.onHandQuantity <= 10).length;
+  const pendingTransfersCount = invState.transfers.filter((t) => t.status === "in_transit" || t.status === "pending").length;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null);
@@ -172,29 +184,29 @@ function ArmazensPage() {
           </Button>
         }
       />
-      {/* Cartões de Capacidade e Alertas dos Armazéns */}
+      {/* Cartões de Capacidade e Alertas dos Armazéns (Dados Reais) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         <Card className="p-3 border-border/60 space-y-1">
           <span className="text-[11px] font-semibold text-muted-foreground uppercase block">Capacidade Ocupada</span>
-          <div className="text-xl font-bold font-mono text-primary">78%</div>
-          <p className="text-[10px] text-muted-foreground">Volume de carga armazenado</p>
+          <div className="text-sm font-bold font-mono text-muted-foreground">Sem dados</div>
+          <p className="text-[10px] text-muted-foreground">Sem limite m³ definido</p>
         </Card>
 
         <Card className="p-3 border-border/60 space-y-1 bg-amber-500/5">
-          <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase block">Materiais Críticos</span>
-          <div className="text-xl font-bold font-mono text-amber-600">3</div>
-          <p className="text-[10px] text-muted-foreground">Abaixo do stock mínimo</p>
+          <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase block">Materiais Esgotados</span>
+          <div className="text-xl font-bold font-mono text-amber-600">{criticalCount}</div>
+          <p className="text-[10px] text-muted-foreground">Com saldo zero</p>
         </Card>
 
         <Card className="p-3 border-border/60 space-y-1 bg-rose-500/5">
           <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase block">Stock Baixo</span>
-          <div className="text-xl font-bold font-mono text-rose-600">2</div>
-          <p className="text-[10px] text-muted-foreground">Necessitam de pedido urgente</p>
+          <div className="text-xl font-bold font-mono text-rose-600">{lowStockCount}</div>
+          <p className="text-[10px] text-muted-foreground">Abaixo de 10 unidades</p>
         </Card>
 
         <Card className="p-3 border-border/60 space-y-1 bg-blue-500/5">
           <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 uppercase block">Transferências Pendentes</span>
-          <div className="text-xl font-bold font-mono text-blue-600">1</div>
+          <div className="text-xl font-bold font-mono text-blue-600">{pendingTransfersCount}</div>
           <p className="text-[10px] text-muted-foreground">Em trânsito entre depósitos</p>
         </Card>
       </div>
@@ -235,7 +247,7 @@ function ArmazensPage() {
                     ) : (
                       <Button
                         variant="ghost"
-                        size="xs"
+                        size="sm"
                         onClick={() => handleSetMain(w)}
                         className="text-xs text-muted-foreground hover:text-foreground"
                       >
@@ -294,7 +306,7 @@ function ArmazensPage() {
               <span>Atividade e Movimentos de Stock nos Armazéns</span>
             </div>
             <Link to="/app/inventory/movements">
-              <Button size="xs" variant="outline" className="h-7 text-[11px] gap-1">
+              <Button size="sm" variant="outline" className="h-7 text-[11px] gap-1">
                 <span>Abrir Todos os Movimentos</span>
                 <ArrowUpRight className="w-3 h-3" />
               </Button>
@@ -326,8 +338,8 @@ function ArmazensPage() {
                           <div key={del.id} className="flex items-center justify-between p-2 rounded bg-background border border-border/50 text-xs">
                             <span className="font-mono font-bold text-primary">{del.deliveryNumber}</span>
                             <Badge variant="outline" className="text-[9px]">{del.status}</Badge>
-                            <Link to="/app/inventory/deliveries_/$deliveryId" params={{ deliveryId: del.id }}>
-                              <Button size="xs" variant="ghost" className="h-6 text-[10px]">Abrir</Button>
+                            <Link to="/app/inventory/deliveries/$deliveryId" params={{ deliveryId: del.id }}>
+                              <Button size="sm" variant="ghost" className="h-6 text-[10px]">Abrir</Button>
                             </Link>
                           </div>
                         ))}
@@ -350,7 +362,7 @@ function ArmazensPage() {
                             <span className="font-mono text-[10px] text-muted-foreground">{mv.id.substring(0, 12)}…</span>
                             <span className="font-mono font-bold text-emerald-600">+{mv.quantity} un</span>
                             <Link to="/app/inventory/movements">
-                              <Button size="xs" variant="ghost" className="h-6 text-[10px]">Ver</Button>
+                              <Button size="sm" variant="ghost" className="h-6 text-[10px]">Ver</Button>
                             </Link>
                           </div>
                         ))}

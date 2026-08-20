@@ -195,3 +195,12 @@ export function runLabourCostTests() {
   console.log("=== TODOS OS 18 TESTES AUTOMATIZADOS DA FASE 5.4 PASSARAM COM SUCESSO! ===");
   return true;
 }
+
+if (typeof describe !== "undefined") {
+  describe("Labour Cost Calculator", () => {
+    it("runs all labour cost tests", () => {
+      expect(runLabourCostTests()).toBe(true);
+    });
+  });
+}
+

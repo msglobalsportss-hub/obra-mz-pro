@@ -166,3 +166,12 @@ export function runAttendanceScheduleTests() {
   console.log("=== TODOS OS 11 TESTES UNITÁRIOS DA FASE 5.1 FORAM EXECUTADOS COM SUCESSO! ===");
   return true;
 }
+
+if (typeof describe !== "undefined") {
+  describe("Attendance Schedule", () => {
+    it("runs all attendance schedule tests", () => {
+      expect(runAttendanceScheduleTests()).toBe(true);
+    });
+  });
+}
+

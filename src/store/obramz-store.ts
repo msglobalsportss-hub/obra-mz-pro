@@ -418,6 +418,11 @@ export type ObraMZState = {
   updatePagamento: (id: string, patch: Partial<Pagamento>) => void;
   deletePagamento: (id: string) => void;
 
+  // Escopo de Sessão / Empresa (Fase 3.7)
+  activeTenantId: string;
+  activeCompanyId: string;
+  setActiveScope: (tenantId: string, companyId: string) => void;
+
   // Empresa & utilizador
   updateEmpresa: (patch: Partial<Empresa>) => void;
   updateUtilizador: (patch: Partial<Utilizador>) => void;
@@ -440,6 +445,8 @@ export type ObraMZState = {
 
   // Presenças (Sprint 4.1)
   attendanceRecords: AttendanceRecord[];
+  attendanceSchedules?: any[];
+  disabledProjectDays?: any[];
   addAttendanceRecord: (data: Omit<AttendanceRecord, "id" | "createdAt" | "updatedAt">) => AttendanceRecord;
   updateAttendanceRecord: (id: string, patch: Partial<AttendanceRecord>) => void;
   deleteAttendanceRecord: (id: string) => void;
@@ -498,7 +505,9 @@ export type ObraMZState = {
   purchaseOrderItems: PurchaseOrderItem[];
   deliveries: Delivery[];
   deliveryItems: DeliveryItem[];
+  /** @deprecated A fonte de verdade de movimentos é o InventoryEngine e o inventoryStoreManager. */
   stockMovements: StockMovement[];
+  /** @deprecated A fonte de verdade de saldos é o InventoryEngine e o inventoryStoreManager. */
   inventoryBalances: InventoryBalance[];
 
   // Pedidos de Compra
@@ -625,6 +634,8 @@ const initialState = {
   deliveryItems: demoDeliveryItemsSeed,
   stockMovements: demoStockMovementsSeed,
   inventoryBalances: demoInventoryBalancesSeed,
+  activeTenantId: "TENANT-HORIZONTE",
+  activeCompanyId: "COMP-HORIZONTE",
   empresa: empresaSeed,
   utilizador: utilizadorSeed,
 };
@@ -646,6 +657,8 @@ export const useObraMZStore = create<ObraMZState>()(
     (set, get) => ({
       ...initialState,
       _hydrated: false,
+
+      setActiveScope: (tenantId, companyId) => set({ activeTenantId: tenantId, activeCompanyId: companyId }),
 
       _addAtividade: (descricao, entidade, entidadeId) =>
         set((s) => ({
@@ -1438,7 +1451,7 @@ export const useObraMZStore = create<ObraMZState>()(
         return { created, updated };
       },
 
-      addAttendanceSchedule: (data) => {
+      addAttendanceSchedule: (data: Omit<AttendanceSchedule, "id" | "createdAt" | "updatedAt">) => {
         const currentSchedules = get().attendanceSchedules || [];
         const validation = validateScheduleOverlap(data, currentSchedules);
         if (!validation.valid) {
@@ -1464,7 +1477,7 @@ export const useObraMZStore = create<ObraMZState>()(
         return schedule;
       },
 
-      updateAttendanceSchedule: (id, patch) => {
+      updateAttendanceSchedule: (id: string, patch: Partial<AttendanceSchedule>) => {
         const currentSchedules = get().attendanceSchedules || [];
         const existing = currentSchedules.find((s) => s.id === id);
         if (!existing) throw new Error("Escala de presença não encontrada.");
@@ -1482,19 +1495,19 @@ export const useObraMZStore = create<ObraMZState>()(
         }));
       },
 
-      deleteAttendanceSchedule: (id) => {
+      deleteAttendanceSchedule: (id: string) => {
         set((s) => ({
           attendanceSchedules: (s.attendanceSchedules || []).filter((item) => item.id !== id),
         }));
       },
 
-      getAttendanceSchedulesByProject: (projectId) => {
+      getAttendanceSchedulesByProject: (projectId: string) => {
         return (get().attendanceSchedules || []).filter(
           (s) => s.projectId === projectId && s.status === "active"
         );
       },
 
-      bulkAddTeamAttendanceSchedules: (teamId, projectId, scheduleData) => {
+      bulkAddTeamAttendanceSchedules: (teamId: string, projectId: string, scheduleData: any) => {
         const team = get().teams?.find((t) => t.id === teamId);
         if (!team) throw new Error("Equipa não encontrada.");
 
@@ -1550,7 +1563,7 @@ export const useObraMZStore = create<ObraMZState>()(
         return newSchedules;
       },
 
-      disableProjectDay: (projectId, date, reason, notes) => {
+      disableProjectDay: (projectId: string, date: string, reason: string, notes?: string) => {
         const existing = (get().disabledProjectDays || []).filter(
           (d) => !(d.projectId === projectId && d.date === date)
         );
@@ -1566,7 +1579,7 @@ export const useObraMZStore = create<ObraMZState>()(
         return record;
       },
 
-      enableProjectDay: (projectId, date) => {
+      enableProjectDay: (projectId: string, date: string) => {
         set((s) => ({
           disabledProjectDays: (s.disabledProjectDays || []).filter(
             (d) => !(d.projectId === projectId && d.date === date)
@@ -1871,7 +1884,7 @@ export const useObraMZStore = create<ObraMZState>()(
           (m) => m.destinationLocationType === "central_stock" || (m as any).warehouseId === id
         );
         const hasBalances = (s.inventoryBalances || []).some(
-          (b) => b.locationType === "central_stock" && b.onHandQuantity > 0
+          (b) => b.locationType === "central_stock" && b.quantityOnHand > 0
         );
         const hasDeliveries = (s.deliveries || []).some(
           (d) => d.destinationType === "central_stock"
@@ -2374,139 +2387,38 @@ export const useObraMZStore = create<ObraMZState>()(
       },
 
       confirmDelivery: (id) => {
-        // ──────────────────────────────────────────────────────────────
-        // FASE 0 — Leitura (sem set)
-        // ──────────────────────────────────────────────────────────────
         const s = get();
-        const delivery = (s.deliveries || []).find(d => d.id === id);
+        const delivery = (s.deliveries || []).find((d) => d.id === id);
 
-        // ──────────────────────────────────────────────────────────────
-        // FASE 1 — Validações (falha = throw; sem set)
-        // ──────────────────────────────────────────────────────────────
         if (!delivery) throw new Error("Entrega não encontrada.");
 
-        // 1.2 — Idempotência: entrega já confirmada → retorno silencioso
+        // IDEMPOTÊNCIA TOTAL: se já confirmada, retorna silenciosamente sem reprocessar
         if (delivery.status === "confirmed") return;
 
-        // 1.3 — Entrega cancelada
-        if (delivery.status === "cancelled")
+        if (delivery.status === "cancelled") {
           throw new Error("Não é possível confirmar uma entrega cancelada.");
-
-        // 1.4 — PO existe
-        const po = (s.purchaseOrders || []).find(o => o.id === delivery.purchaseOrderId);
-        if (!po) throw new Error("Pedido de compra associado não encontrado.");
-
-        // 1.5 — PO não está encerrado
-        if (po.status === "cancelled" || po.status === "received")
-          throw new Error(`O pedido de compra está no estado "${po.status}" e não aceita novas entregas.`);
-
-        // 1.6 — Detetar movimentos orfãos (draft com movimentos preexistentes)
-        const delItemIds = (s.deliveryItems || [])
-          .filter(i => i.deliveryId === id)
-          .map(i => i.id);
-        const hasOrphanMovements = (s.stockMovements || []).some(
-          m => m.deliveryItemId && delItemIds.includes(m.deliveryItemId)
-        );
-        if (hasOrphanMovements)
-          throw new Error(
-            "Foi detetado um movimento de stock associado a uma entrega ainda não confirmada. " +
-            "Execute a auditoria ou reconstrução dos saldos antes de continuar."
-          );
-
-        // 1.7 — Validar cada DeliveryItem
-        const delItems = (s.deliveryItems || []).filter(i => i.deliveryId === id);
-        for (const item of delItems) {
-          if (!Number.isFinite(item.acceptedQuantity) || item.acceptedQuantity < 0)
-            throw new Error(`Item ${item.id}: acceptedQuantity inválido.`);
-          if (!Number.isFinite(item.acceptedPurchaseQuantity) || item.acceptedPurchaseQuantity < 0)
-            throw new Error(`Item ${item.id}: acceptedPurchaseQuantity inválido.`);
-          if (!Number.isFinite(item.actualUnitCost) || item.actualUnitCost < 0)
-            throw new Error(`Item ${item.id}: actualUnitCost inválido.`);
-          if (!Number.isFinite(item.actualBaseUnitCost) || item.actualBaseUnitCost < 0)
-            throw new Error(`Item ${item.id}: actualBaseUnitCost inválido.`);
-          if (!Number.isFinite(item.conversionFactor) || item.conversionFactor <= 0)
-            throw new Error(`Item ${item.id}: conversionFactor inválido.`);
-          if (item.acceptedQuantity > item.receivedBaseQuantity + 0.001)
-            throw new Error(`Item ${item.id}: acceptedQuantity excede receivedBaseQuantity.`);
         }
 
-        // 1.8 — Destino coerente
-        if (delivery.destinationType !== "central_stock" && !delivery.destinationProjectId)
-          throw new Error("destinationProjectId é obrigatório para o destino desta entrega.");
+        const po = (s.purchaseOrders || []).find((o) => o.id === delivery.purchaseOrderId);
+        if (!po) throw new Error("Pedido de compra associado não encontrado.");
 
-        // ──────────────────────────────────────────────────────────────
-        // FASE 2 — Construção dos novos arrays (sem set)
-        // ──────────────────────────────────────────────────────────────
-        const newMovements: StockMovement[] = [];
-        const updatedBalancesMap = new Map<string, InventoryBalance>();
+        if (po.status === "cancelled" || po.status === "received") {
+          throw new Error(`O pedido de compra está no estado "${po.status}" e não aceita novas entregas.`);
+        }
+
+        const delItems = (s.deliveryItems || []).filter((i) => i.deliveryId === id);
         const updatedItemsMap = new Map<string, PurchaseOrderItem>();
         const now = nowIso();
 
+        // Atualizar quantidades recebidas nos itens do Pedido de Compra
         for (const item of delItems) {
-          if (item.acceptedQuantity <= 0) continue;
-
-          // 2.1 — Resolver destino de inventário
-          const { locationType: destLocationType, projectId: destProjectId } =
-            resolveInventoryDestination(delivery.destinationType, delivery.destinationProjectId);
-
-          // 2.2 — Criar StockMovement
-          const movement: StockMovement = {
-            id: uid(),
-            materialId: item.materialId,
-            movementType: "purchase_receipt",
-            quantity: item.acceptedQuantity,
-            unitId: (s.materials || []).find(m => m.id === item.materialId)?.unitId ?? "",
-            unitCost: item.actualBaseUnitCost,
-            totalCost: item.acceptedQuantity * item.actualBaseUnitCost,
-            destinationLocationType: destLocationType,
-            destinationProjectId: destProjectId,
-            purchaseOrderId: delivery.purchaseOrderId,
-            deliveryId: delivery.id,
-            deliveryItemId: item.id,
-            referenceType: "delivery_item",
-            referenceId: item.id,
-            movementDate: delivery.deliveryDate,
-            performedBy: delivery.receivedBy,
-            reason: `Receção de compra ${po.orderNumber} / ${delivery.deliveryNumber}`,
-            notes: undefined,
-            createdAt: now,
-          };
-          newMovements.push(movement);
-
-          // 2.3–2.6 — Atualizar InventoryBalance
-          const balKey = getInventoryBalanceKey(item.materialId, destLocationType, destProjectId);
-          const currentBal =
-            updatedBalancesMap.get(balKey) ??
-            (s.inventoryBalances || []).find(
-              b => getInventoryBalanceKey(b.materialId, b.locationType, b.projectId) === balKey
-            );
-          const currentQty = currentBal?.quantityOnHand ?? 0;
-          const currentAvg = currentBal?.averageCost ?? 0;
-          const newAvg = calculateWeightedAverageCost(currentQty, currentAvg, item.acceptedQuantity, item.actualBaseUnitCost);
-          const newQty = (Number.isFinite(currentQty) && currentQty >= 0 ? currentQty : 0) + item.acceptedQuantity;
-          const newTotalValue = Number.isFinite(newQty) && Number.isFinite(newAvg) ? newQty * newAvg : 0;
-          const updatedBal: InventoryBalance = {
-            id: currentBal?.id ?? uid(),
-            materialId: item.materialId,
-            locationType: destLocationType,
-            projectId: destProjectId,
-            quantityOnHand: newQty,
-            averageCost: newAvg,
-            totalValue: newTotalValue,
-            lastMovementAt: now,
-            createdAt: currentBal?.createdAt ?? now,
-            updatedAt: now,
-          };
-          updatedBalancesMap.set(balKey, updatedBal);
-
-          // 2.7 — Acumular PurchaseOrderItem atualizado
           const existingPOI =
             updatedItemsMap.get(item.purchaseOrderItemId) ??
-            (s.purchaseOrderItems || []).find(p => p.id === item.purchaseOrderItemId);
+            (s.purchaseOrderItems || []).find((p) => p.id === item.purchaseOrderItemId);
           if (existingPOI) {
-            const newReceivedPurchase = existingPOI.receivedPurchaseQuantity + item.acceptedPurchaseQuantity;
-            const newReceivedBase = existingPOI.receivedBaseQuantity + item.acceptedQuantity;
-            const newRemaining = existingPOI.orderedPurchaseQuantity - newReceivedPurchase;
+            const newReceivedPurchase = existingPOI.receivedPurchaseQuantity + (item.acceptedPurchaseQuantity || 0);
+            const newReceivedBase = existingPOI.receivedBaseQuantity + (item.acceptedQuantity || 0);
+            const newRemaining = Math.max(0, existingPOI.orderedPurchaseQuantity - newReceivedPurchase);
             updatedItemsMap.set(item.purchaseOrderItemId, {
               ...existingPOI,
               receivedPurchaseQuantity: newReceivedPurchase,
@@ -2517,68 +2429,20 @@ export const useObraMZStore = create<ObraMZState>()(
           }
         }
 
-        // ──────────────────────────────────────────────────────────────
-        // FASE 3 — Calcular estado do PurchaseOrder
-        // ──────────────────────────────────────────────────────────────
         const allPOItems = (s.purchaseOrderItems || [])
-          .filter(p => p.purchaseOrderId === delivery.purchaseOrderId)
-          .map(p => updatedItemsMap.get(p.id) ?? p);
+          .filter((p) => p.purchaseOrderId === delivery.purchaseOrderId)
+          .map((p) => updatedItemsMap.get(p.id) ?? p);
         const newOrderStatus = calculateOrderStatusFromItems(allPOItems);
 
-        // ──────────────────────────────────────────────────────────────
-        // FASE 3.5 — Ponte Atómica com o InventoryEngine da Fase 2B/3
-        // ──────────────────────────────────────────────────────────────
-        try {
-          const destLocId = delivery.destinationType === "central_stock"
-            ? (delivery as any).warehouseId || "LOC-MAIN-WH"
-            : delivery.destinationProjectId || "LOC-SITE-PROJ";
-
-          inventoryActions.processDelivery({
-            deliveryId: delivery.id,
-            receiptId: `REC-${delivery.id}`,
-            tenantId: "TENANT-A",
-            companyId: "COMP-1",
-            supplierId: po.supplierId,
-            destinationType: delivery.destinationType === "central_stock" ? "warehouse" : "project",
-            destinationLocationId: destLocId,
-            confirmedAt: delivery.deliveryDate,
-            confirmedByActorId: delivery.receivedBy || "actor-manager",
-            items: delItems
-              .filter((i) => i.acceptedQuantity > 0)
-              .map((i) => ({
-                deliveryItemId: i.id,
-                materialId: i.materialId,
-                receivedQuantity: i.acceptedQuantity,
-                unitCost: i.actualBaseUnitCost,
-              })),
-          });
-        } catch (engineErr) {
-          // Se o InventoryEngine rejeitar por idempotência ou erro de validação,
-          // permitimos que a confirmação prossiga se for replay idempotente.
-          console.warn("[confirmDelivery Bridge] Notificação ao InventoryEngine:", engineErr);
-        }
-
-        // ──────────────────────────────────────────────────────────────
-        // FASE 4 — Único set() — tudo ou nada
-        // ──────────────────────────────────────────────────────────────
-        const updatedBalanceKeys = new Set(updatedBalancesMap.keys());
-        const mergedBalances = [
-          ...(s.inventoryBalances || []).filter(
-            b => !updatedBalanceKeys.has(getInventoryBalanceKey(b.materialId, b.locationType, b.projectId))
-          ),
-          ...[...updatedBalancesMap.values()],
-        ];
-
-        set(s => ({
-          stockMovements: [...(s.stockMovements || []), ...newMovements],
-          inventoryBalances: mergedBalances,
-          deliveries: (s.deliveries || []).map(d =>
+        // FECHAMENTO DOCUMENTAL APENAS: Não mexe em stock físico nem cria StockMovement
+        set((s) => ({
+          deliveries: (s.deliveries || []).map((d) =>
             d.id === id ? { ...d, status: "confirmed" as const, confirmedAt: now, updatedAt: now } : d
           ),
-          purchaseOrderItems: (s.purchaseOrderItems || []).map(p =>
+          purchaseOrderItems: (s.purchaseOrderItems || []).map((p) =>
             updatedItemsMap.has(p.id) ? updatedItemsMap.get(p.id)! : p
           ),
-          purchaseOrders: (s.purchaseOrders || []).map(o =>
+          purchaseOrders: (s.purchaseOrders || []).map((o) =>
             o.id === delivery.purchaseOrderId ? { ...o, status: newOrderStatus, updatedAt: now } : o
           ),
         }));

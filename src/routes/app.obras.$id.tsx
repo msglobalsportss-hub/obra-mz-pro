@@ -25,6 +25,7 @@ import {
 } from "@/lib/mock-data";
 import { formatDate, formatMZN } from "@/lib/format";
 import { StatCard } from "@/components/stat-card";
+import { Badge } from "@/components/ui/badge";
 import {
   Wallet,
   TrendingDown,
@@ -215,7 +216,7 @@ function ObraDetalhe() {
                       Últimas Entregas nesta Obra ({projectDeliveries.length})
                     </span>
                     <Link to="/app/inventory/deliveries">
-                      <Button size="xs" variant="ghost" className="h-6 text-[10px] text-primary">
+                      <Button size="sm" variant="ghost" className="h-6 text-[10px] text-primary">
                         Ver todas ({projectDeliveries.length})
                       </Button>
                     </Link>
@@ -233,8 +234,8 @@ function ObraDetalhe() {
                             {formatDate(del.updatedAt || del.createdAt)}
                           </span>
                         </div>
-                        <Link to="/app/inventory/deliveries_/$deliveryId" params={{ deliveryId: del.id }}>
-                          <Button size="xs" variant="outline" className="h-6 text-[10px] gap-1 px-2">
+                        <Link to="/app/inventory/deliveries/$deliveryId" params={{ deliveryId: del.id }}>
+                          <Button size="sm" variant="outline" className="h-6 text-[10px] gap-1 px-2">
                             <span>Abrir</span>
                             <ArrowUpRight className="w-2.5 h-2.5" />
                           </Button>
@@ -251,7 +252,7 @@ function ObraDetalhe() {
               const stockMovements = useObraMZStore.getState().stockMovements || [];
               const todayStr = new Date().toISOString().slice(0, 10);
               const todayConsumptions = stockMovements.filter(
-                (m) => m.projectId === obra.id && m.movementType.includes("consumption") && m.occurredAt?.slice(0, 10) === todayStr
+                (m: any) => (m.projectId === obra.id || m.referenceId === obra.id) && (m.movementType === 'project_issue' || m.movementType?.includes("consumption")) && (m.occurredAt || m.createdAt)?.slice(0, 10) === todayStr
               );
 
               return (

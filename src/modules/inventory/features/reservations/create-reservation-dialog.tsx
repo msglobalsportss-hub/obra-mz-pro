@@ -36,8 +36,8 @@ interface CreateReservationDialogProps {
 }
 
 export function CreateReservationDialog({ open, onOpenChange }: CreateReservationDialogProps) {
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
 
   const [materialIdInput, setMaterialIdInput] = useState("MAT-STEEL");
   const [locationIdInput, setLocationIdInput] = useState("LOC-MAIN-WH");

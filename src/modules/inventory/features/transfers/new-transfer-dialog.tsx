@@ -12,11 +12,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useInventoryOperation } from "../../hooks/use-inventory-operation";
-import { inventoryActions } from "../../application/actions/action-container";
+import { inventoryActions, defaultUnitOfWork } from "../../application/actions/action-container";
 import { useObraMZStore } from "@/store/obramz-store";
 import { inventoryStoreManager } from "../../store/inventory-store";
 import { MaterialCombobox, InventoryLocationSelector } from "../../components/selectors";
-import { toTenantId, toCompanyId } from "../../core/shared/primitives";
+import {
+  toTenantId,
+  toCompanyId,
+  toStockTransferId,
+  toInventoryLocationId,
+} from "../../core/shared/primitives";
 import { ArrowLeftRight, Loader2, CheckCircle2, AlertTriangle, Truck } from "lucide-react";
 
 interface NewTransferDialogProps {
@@ -25,30 +30,38 @@ interface NewTransferDialogProps {
 }
 
 export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps) {
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
 
   const materials = useObraMZStore((s) => s.materials || []);
   const warehouses = useObraMZStore((s) => s.warehouses || []);
   const obras = useObraMZStore((s) => s.obras || []);
 
+  const [storeState, setStoreState] = useState(inventoryStoreManager.getState());
+
+  useEffect(() => {
+    return inventoryStoreManager.subscribe(setStoreState);
+  }, []);
+
+  const defaultDestLoc = obras[0]?.id
+    ? `LOC-PROJ-${obras[0].id}`
+    : warehouses[1]?.id || warehouses[0]?.id || "WH-MAIN";
+
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || "MAT-CEMENT");
   const [sourceLocationId, setSourceLocationId] = useState(warehouses[0]?.id || "WH-MAIN");
-  const [destinationLocationId, setDestinationLocationId] = useState(
-    obras[0]?.id ? `LOC-PROJ-${obras[0].id}` : "LOC-PROJ-1"
-  );
+  const [destinationLocationId, setDestinationLocationId] = useState(defaultDestLoc);
   const [quantityInput, setQuantityInput] = useState("10");
 
   const isSameLocation = sourceLocationId.trim() === destinationLocationId.trim();
 
-  // Stock disponível na origem
+  // Stock disponível na origem (reativo)
   const sourceAvailableStock = useMemo(() => {
-    const balances = Object.values(inventoryStoreManager.getState().balances);
+    const balances = Object.values(storeState.balances);
     const sourceBal = balances.find(
       (b) => b.materialId === selectedMaterialId && b.locationId === sourceLocationId
     );
     return sourceBal ? Math.max(0, sourceBal.onHandQuantity - sourceBal.reservedQuantity) : 0;
-  }, [selectedMaterialId, sourceLocationId]);
+  }, [storeState.balances, selectedMaterialId, sourceLocationId]);
 
   const parsedQty = parseFloat(quantityInput) || 0;
 
@@ -56,7 +69,22 @@ export function NewTransferDialog({ open, onOpenChange }: NewTransferDialogProps
     const transferId = `trf-${Date.now()}`;
     const transitLocationId = `LOC-TRANSIT-${transferId}`;
 
-    // Etapa 1: Origem -> Localização Virtual Em Trânsito
+    // 1. Persistir o documento StockTransfer com a localização de destino real escolhida
+    await defaultUnitOfWork.transfers.save({
+      id: toStockTransferId(transferId),
+      tenantId: toTenantId(activeTenantId),
+      companyId: toCompanyId(activeCompanyId),
+      transferNumber: `TRF-${Date.now().toString().slice(-6)}`,
+      sourceLocationId: toInventoryLocationId(sourceLocationId),
+      destinationLocationId: toInventoryLocationId(destinationLocationId),
+      status: "in_transit",
+      requestedAt: new Date().toISOString(),
+      dispatchedAt: new Date().toISOString(),
+      correlationId: transferId as any,
+      idempotencyKey: params.idempotencyKey as any,
+    });
+
+    // 2. Executar saída do stock da origem para a localização virtual em trânsito
     return inventoryActions.transferStock({
       tenantId: toTenantId(activeTenantId),
       companyId: toCompanyId(activeCompanyId),

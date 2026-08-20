@@ -32,8 +32,8 @@ interface ConfirmTransferReceiptDialogProps {
 }
 
 export function ConfirmTransferReceiptDialog({ open, onOpenChange, transfer }: ConfirmTransferReceiptDialogProps) {
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
 
   const materials = useObraMZStore((s) => s.materials || []);
   const warehouses = useObraMZStore((s) => s.warehouses || []);
@@ -52,7 +52,7 @@ export function ConfirmTransferReceiptDialog({ open, onOpenChange, transfer }: C
     // Transferir da localização virtual de trânsito para o destino real
     const transitLocationId = `LOC-TRANSIT-${transfer.id}`;
 
-    return inventoryActions.transferStock({
+    const res = await inventoryActions.transferStock({
       tenantId: toTenantId(activeTenantId),
       companyId: toCompanyId(activeCompanyId),
       correlationId: transfer.id,
@@ -64,6 +64,20 @@ export function ConfirmTransferReceiptDialog({ open, onOpenChange, transfer }: C
       destinationLocationId: transfer.destinationLocationId,
       quantity: receivedQty,
     });
+
+    if (res && res.success) {
+      // Atualizar status do documento de transferência para "recebida"
+      const existingDoc = await defaultUnitOfWork.transfers.findById(toStockTransferId(transfer.id));
+      if (existingDoc) {
+        await defaultUnitOfWork.transfers.save({
+          ...existingDoc,
+          status: "received",
+          receivedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    return res;
   });
 
   const handleSubmit = async (e: React.FormEvent) => {

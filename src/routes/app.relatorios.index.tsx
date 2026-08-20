@@ -10,6 +10,7 @@
  * - Financeiro
  */
 
+import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/page-header";
 import { PageContainer } from "@/components/shared/page-container";
@@ -49,7 +50,7 @@ import {
   Line,
   Legend,
 } from "recharts";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useObraMZStore, totalsPorCliente } from "@/store/obramz-store";
 import { inventoryStoreManager } from "@/modules/inventory/store/inventory-store";
 import { DEFAULT_INITIAL_WAREHOUSES } from "@/lib/materials/warehouse";
@@ -80,9 +81,14 @@ function Relatorios() {
   const totalOrc = orcFiltrados.reduce((s, o) => s + totalOrcamento(o).total, 0);
   const totalPag = pagFiltrados.reduce((s, p) => s + p.valor, 0);
 
-  // Mapeamento de Inventário
-  const inventoryBalances = Object.values(inventoryStoreManager.getState().balances);
-  const totalInventoryValue = inventoryBalances.reduce((s, b) => s + b.totalValue, 0);
+  const [invState, setInvState] = useState(inventoryStoreManager.getState());
+  useEffect(() => {
+    return inventoryStoreManager.subscribe(setInvState);
+  }, []);
+
+  // Mapeamento de Inventário (Reativo)
+  const inventoryBalances = Object.values(invState.balances);
+  const totalInventoryValue = inventoryBalances.reduce((s, b) => s + (b.totalValue || 0), 0);
 
   const exportCsv = () => {
     const rows = [

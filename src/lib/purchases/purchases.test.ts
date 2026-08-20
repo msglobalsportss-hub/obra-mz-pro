@@ -668,3 +668,13 @@ export function runPurchasesTests(): { passedCount: number; totalCount: number; 
   const passedCount = results.filter((r) => r.passed).length;
   return { passedCount, totalCount: results.length, results };
 }
+
+if (typeof describe !== "undefined") {
+  describe("Purchases Validation", () => {
+    it("runs all purchases tests", () => {
+      const res = runPurchasesTests();
+      expect(res.passedCount).toBeGreaterThanOrEqual(36);
+    });
+  });
+}
+

@@ -25,6 +25,8 @@ import { toast } from "sonner";
 
 const STORAGE_KEY = "obramz_compras_ui_state";
 
+import { inventoryStoreManager } from "@/modules/inventory/store/inventory-store";
+
 export const Route = createFileRoute("/app/compras/")({
   component: ComprasIndexRoute,
 });
@@ -33,9 +35,22 @@ function ComprasIndexRoute() {
   const purchaseOrders = useObraMZStore((s) => s.purchaseOrders || []);
   const purchaseOrderItems = useObraMZStore((s) => s.purchaseOrderItems || []);
   const deliveries = useObraMZStore((s) => s.deliveries || []);
-  const stockMovements = useObraMZStore((s) => s.stockMovements || []);
+  const legacyMovements = useObraMZStore((s) => s.stockMovements || []);
   const suppliers = useObraMZStore((s) => s.suppliers || []);
   const obras = useObraMZStore((s) => s.obras || []);
+
+  const [invState, setInvState] = useState(inventoryStoreManager.getState());
+  useEffect(() => {
+    return inventoryStoreManager.subscribe(setInvState);
+  }, []);
+
+  // Fonte única do Query Store do Engine + legacy para compatibilidade durante migração
+  const stockMovements = useMemo(() => {
+    if (invState.movements && invState.movements.length > 0) {
+      return invState.movements as any[];
+    }
+    return legacyMovements;
+  }, [invState.movements, legacyMovements]);
 
   const cancelPurchaseOrder = useObraMZStore((s) => s.cancelPurchaseOrder);
   const prepareDuplicate = useObraMZStore((s) => s.preparePurchaseOrderDuplicate);

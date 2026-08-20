@@ -16,7 +16,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { Material } from "@/lib/mock-data";
 import { useObraMZStore } from "@/store/obramz-store";
 import { formatMZN, formatDate } from "@/lib/format";
-import { runMaterialsTests } from "@/lib/materials";
 import { PageHeader } from "@/components/page-header";
 import { PageContainer } from "@/components/shared/page-container";
 import { MaterialFormDialog } from "@/components/materials/material-form-dialog";
@@ -80,15 +79,6 @@ function MateriaisPage() {
   const deactivateMaterial = useObraMZStore((s) => s.deactivateMaterial);
 
   const [activeTab, setActiveTab] = useState("overview");
-
-  // Execução dos testes automatizados
-  useEffect(() => {
-    try {
-      runMaterialsTests();
-    } catch (e: unknown) {
-      console.error("Erro nos testes de materiais:", e);
-    }
-  }, []);
 
   // Controlos de Dialogs do Cadastro
   const [formOpen, setFormOpen] = useState(false);
@@ -455,7 +445,7 @@ function MateriaisPage() {
       </Tabs>
 
       {/* Modais de Cadastro de Materiais */}
-      <MaterialFormDialog open={formOpen} onOpenChange={setFormOpen} material={editingMaterial} />
+      <MaterialFormDialog open={formOpen} onOpenChange={setFormOpen} materialToEdit={editingMaterial} />
       {viewingMaterial && (
         <MaterialDetailsDialog
           open={detailsOpen}

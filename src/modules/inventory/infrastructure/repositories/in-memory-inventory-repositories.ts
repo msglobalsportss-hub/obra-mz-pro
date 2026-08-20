@@ -240,6 +240,10 @@ export class InMemoryStockMovementRepository implements IStockMovementRepository
     });
   }
 
+  async findAll(): Promise<readonly StockMovement[]> {
+    return Array.from(this.movements.values());
+  }
+
   async appendMovement(movement: StockMovement): Promise<void> {
     this.movements.set(movement.id, movement);
   }
@@ -256,6 +260,10 @@ export class InMemoryStockMovementRepository implements IStockMovementRepository
 // ---------------------------------------------------------------------------
 export class InMemoryInventoryBalanceRepository implements IInventoryBalanceRepository {
   private balances = new Map<string, InventoryBalance>();
+
+  async findAll(): Promise<readonly InventoryBalance[]> {
+    return Array.from(this.balances.values());
+  }
 
   async findById(id: InventoryBalanceId): Promise<InventoryBalance | null> {
     return this.balances.get(id) ?? null;
@@ -325,6 +333,10 @@ export class InMemoryInventoryBalanceRepository implements IInventoryBalanceRepo
 export class InMemoryInventoryReservationRepository implements IInventoryReservationRepository {
   private reservations = new Map<string, InventoryReservation>();
 
+  async findAll(): Promise<readonly InventoryReservation[]> {
+    return Array.from(this.reservations.values());
+  }
+
   async findById(id: InventoryReservationId): Promise<InventoryReservation | null> {
     return this.reservations.get(id) ?? null;
   }
@@ -383,6 +395,10 @@ export class InMemoryInventoryReservationRepository implements IInventoryReserva
 export class InMemoryStockTransferRepository implements IStockTransferRepository {
   private transfers = new Map<string, StockTransfer>();
   private items = new Map<string, StockTransferItem>();
+
+  async findAll(): Promise<readonly StockTransfer[]> {
+    return Array.from(this.transfers.values());
+  }
 
   async findById(id: StockTransferId): Promise<StockTransfer | null> {
     return this.transfers.get(id) ?? null;

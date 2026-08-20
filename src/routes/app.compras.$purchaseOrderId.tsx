@@ -35,6 +35,8 @@ export const Route = createFileRoute("/app/compras/$purchaseOrderId")({
   component: PurchaseOrderDetailsRoute,
 });
 
+import { inventoryStoreManager } from "@/modules/inventory/store/inventory-store";
+
 function PurchaseOrderDetailsRoute() {
   const { purchaseOrderId } = useParams({ from: "/app/compras/$purchaseOrderId" });
 
@@ -44,7 +46,17 @@ function PurchaseOrderDetailsRoute() {
   const project = useObraMZStore((s) => s.obras).find((o) => o.id === po?.destinationProjectId);
   const items = useObraMZStore((s) => s.purchaseOrderItems).filter((i) => i.purchaseOrderId === purchaseOrderId);
   const deliveries = useObraMZStore((s) => s.deliveries).filter((d) => d.purchaseOrderId === purchaseOrderId);
-  const movements = useObraMZStore((s) => s.stockMovements).filter((m) => m.purchaseOrderId === purchaseOrderId);
+  const legacyMovements = useObraMZStore((s) => s.stockMovements).filter((m) => m.purchaseOrderId === purchaseOrderId);
+
+  const [invState, setInvState] = React.useState(inventoryStoreManager.getState());
+  React.useEffect(() => {
+    return inventoryStoreManager.subscribe(setInvState);
+  }, []);
+
+  const engineMovements = (invState.movements || []).filter(
+    (m: any) => m.referenceId === purchaseOrderId || m.correlationId === purchaseOrderId
+  );
+  const movements = engineMovements.length > 0 ? engineMovements : legacyMovements;
 
   const approvePurchaseOrder = useObraMZStore((s) => s.approvePurchaseOrder);
   const sendPurchaseOrder = useObraMZStore((s) => s.sendPurchaseOrder);
@@ -423,7 +435,7 @@ function PurchaseOrderDetailsRoute() {
                 {deliveries.map((del) => (
                   <tr key={del.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40">
                     <td className="p-3 font-semibold text-blue-600 dark:text-blue-400">
-                      <Link to="/app/inventory/deliveries_/$deliveryId" params={{ deliveryId: del.id }} className="hover:underline flex items-center gap-1 font-bold">
+                      <Link to="/app/inventory/deliveries/$deliveryId" params={{ deliveryId: del.id }} className="hover:underline flex items-center gap-1 font-bold">
                         <span>{del.deliveryNumber}</span>
                         <ExternalLink className="w-3 h-3" />
                       </Link>
@@ -447,7 +459,7 @@ function PurchaseOrderDetailsRoute() {
                         className="h-7 text-xs gap-1 text-primary"
                         asChild
                       >
-                        <Link to="/app/inventory/deliveries_/$deliveryId" params={{ deliveryId: del.id }}>
+                        <Link to="/app/inventory/deliveries/$deliveryId" params={{ deliveryId: del.id }}>
                           <span>Abrir</span>
                           <ExternalLink className="w-3 h-3" />
                         </Link>

@@ -401,7 +401,7 @@ function EquipasPage() {
                 {isWorkerFiltered && (
                   <Button
                     variant="ghost"
-                    size="xs"
+                    size="sm"
                     onClick={clearWorkerFilters}
                     className="text-xs text-destructive hover:bg-destructive/10 h-7"
                   >
@@ -608,15 +608,15 @@ function EquipasPage() {
                     </div>
 
                     <div className="flex justify-end gap-1.5 border-t pt-2 mt-3">
-                      <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleOpenDetailWorker(w)}>
+                      <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleOpenDetailWorker(w)}>
                         <Eye className="h-3 w-3 mr-1" />Detalhes
                       </Button>
-                      <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleEditWorker(w)}>
+                      <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleEditWorker(w)}>
                         <Pencil className="h-3 w-3 mr-1" />Editar
                       </Button>
                       <Button
                         variant={w.status === "active" ? "destructive" : "outline"}
-                        size="xs"
+                        size="sm"
                         className={`h-7 text-[10px] font-normal ${w.status === "inactive" ? "text-emerald-600 hover:bg-emerald-50 border-emerald-200" : ""}`}
                         onClick={() => handleToggleWorkerStatus(w)}
                       >
@@ -669,7 +669,7 @@ function EquipasPage() {
                 {isTeamFiltered && (
                   <Button
                     variant="ghost"
-                    size="xs"
+                    size="sm"
                     onClick={clearTeamFilters}
                     className="text-xs text-destructive hover:bg-destructive/10 h-7"
                   >
@@ -859,15 +859,15 @@ function EquipasPage() {
                       </div>
 
                       <div className="flex justify-end gap-1.5 border-t pt-2 mt-3">
-                        <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleOpenDetailTeam(t)}>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleOpenDetailTeam(t)}>
                           <Eye className="h-3 w-3 mr-1" />Detalhes
                         </Button>
-                        <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleEditTeam(t)}>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleEditTeam(t)}>
                           <Pencil className="h-3 w-3 mr-1" />Editar
                         </Button>
                         <Button
                           variant={t.status === "active" ? "destructive" : "outline"}
-                          size="xs"
+                          size="sm"
                           className={`h-7 text-[10px] font-normal ${t.status === "inactive" ? "text-emerald-600 hover:bg-emerald-50 border-emerald-200" : ""}`}
                           onClick={() => handleToggleTeamStatus(t)}
                         >
@@ -923,7 +923,7 @@ function EquipasPage() {
                 {isAssignFiltered && (
                   <Button
                     variant="ghost"
-                    size="xs"
+                    size="sm"
                     onClick={clearAssignFilters}
                     className="text-xs text-destructive hover:bg-destructive/10 h-7"
                   >
@@ -1202,18 +1202,18 @@ function EquipasPage() {
                       </div>
 
                       <div className="flex justify-end gap-1.5 border-t pt-2 mt-3">
-                        <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleOpenDetailAssign(a)}>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleOpenDetailAssign(a)}>
                           <Eye className="h-3 w-3 mr-1" />Detalhes
                         </Button>
-                        <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleEditAssign(a)}>
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleEditAssign(a)}>
                           <Pencil className="h-3 w-3 mr-1" />Editar
                         </Button>
                         {a.status === "active" && (
                           <>
-                            <Button variant="outline" size="xs" className="h-7 text-[10px] font-normal text-emerald-600 hover:bg-emerald-50" onClick={() => handleStartCompleteAssign(a)}>
+                            <Button variant="outline" size="sm" className="h-7 text-[10px] font-normal text-emerald-600 hover:bg-emerald-50" onClick={() => handleStartCompleteAssign(a)}>
                               Encerrar
                             </Button>
-                            <Button variant="destructive" size="xs" className="h-7 text-[10px] font-normal" onClick={() => handleStartCancelAssign(a)}>
+                            <Button variant="destructive" size="sm" className="h-7 text-[10px] font-normal" onClick={() => handleStartCancelAssign(a)}>
                               Cancelar
                             </Button>
                           </>

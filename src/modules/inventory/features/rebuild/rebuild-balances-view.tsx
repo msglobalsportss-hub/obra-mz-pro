@@ -31,8 +31,8 @@ import type { InventoryBalanceRebuildResult } from "../../core/engine/inventory-
 
 export function RebuildBalancesView() {
   const permissions = useInventoryPermissions();
-  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId) ?? "COMP-1";
-  const activeTenantId = useObraMZStore((s) => s.activeTenantId) ?? "TENANT-A";
+  const activeCompanyId = useObraMZStore((s) => s.activeCompanyId);
+  const activeTenantId = useObraMZStore((s) => s.activeTenantId);
 
   const [dryRun, setDryRun] = useState(true);
   const [materialFilter, setMaterialFilter] = useState("");
